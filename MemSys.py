@@ -4,17 +4,10 @@ import numpy as np
 import matplotlib.cm as cm
 import os, sys, shutil
 import shelve
-import multiprocessing as mp
-from scipy.spatial import Voronoi
 #import my running stats class
 from RunningStats import *
 # import the coordinate wrapping function--for unwrapping
 from pUnwrap import mda_wrap_coordinates
-
-
-#dictionary of elements and their valence electron counts - used for electron profile density
-valence_dict = {'H':1,'C':4,'N':5,'O':6,'P':5}
-
 
 #lipid center of mass object - stores the center of mass of a lipid/residue - stores both wrapped and unwrapped coordinates
 class LipidCOM:
@@ -57,21 +50,11 @@ class Frame:
 class frames:
 	_type_error ="instance of object MemSys.frames only excepts instances of MemSys.Frame"
 	
-	def __init__(self,prefix='/tmp/',save=False):
+	def __init__(self,prefix='/tmp/'):
 			self.nframes = 0
-			self.pid = os.getpid()
-			if prefix == 'Default':
-				prefix = '/tmp/'
-			
 			if	prefix[-1] != '/':
 				prefix = prefix +'/'
-			path = prefix
-			if	save:
-				path = path+'mem_sys_frames'
-			else:
-				path = path+'.mem_sys_frames_'+str(self.pid)			
-			self.path = path
-			self.save = save
+			self.path = prefix+'.mem_sys_frames'
 			if os.path.isdir(self.path):
 				shutil.rmtree(self.path)
 			os.mkdir(self.path, 0755)
@@ -81,9 +64,8 @@ class frames:
 
 	def __del__(self):
 		self.frame_shelf.close()
-		if not self.save:
-			if os.path.isdir(self.path):
-				shutil.rmtree(self.path)
+		if os.path.isdir(self.path):
+			shutil.rmtree(self.path)
 		return
 
 	def append(self,item):
@@ -121,36 +103,7 @@ class frames:
 		self.append(item)
 		return self
 			
-#a frames object to pass to parallelized functions - pass the 
-class par_frames:
-	
-	def __init__(self,nframes, fs_name,frame_shelve):
-			self.nframes = nframes			
-			self.fs_name = fs_name 
-			#print "par_frames instance"
-			#print "self.nframes ",self.nframes
-			#print "self.fs_name ",self.fs_name
-			#self.frame_shelf = shelve.open(self.fs_name,flag="r", protocol=2)
-			self.frame_shelf = frame_shelve
-			return
 
-#	def __del__(self):
-#		self.frame_shelf.close()
-#		return
-	
-
-	def __getitem__(self,key):
-		if key < 0:
-			key += self.nframes
-		elif key > self.nframes:
-			key = self.nframes-1
-		
-		return self.frame_shelf[str(key)]
-
-	def __len__(self):
-		return self.nframes
-
-			
 # leaflet object	
 class Leaflet:
 	def __init__(self, name):
@@ -165,8 +118,7 @@ class Leaflet:
 		return '%s leaflet of a Membrane System with %s members and %s lipid groups' % (self.name, len(self.members), len(self.groups)) 
 	def __repr__(self):
 		return '%s leaflet of a Membrane System with %s members and %s lipid groups' % (self.name, len(self.members), len(self.groups)) 
-	def __len__(self):
-		return len(self.members)
+
 	def AddMember(self, index, resname):
 		
 		if	len(self.members) == 0:
@@ -222,12 +174,6 @@ class Leaflet:
 
 	def HasGroup(self, group_name):
 		return [group_name in self.group_dict]
-
-	def NumGroups(self):
-		return len(self.groups)
-
-	def GetGroupNames(self):
-		return [group.lg_name for group in self.groups]
 		
 class LipidGroup:
 	def __init__(self, name):
@@ -239,75 +185,11 @@ class LipidGroup:
 		self.lg_members.append(new_mem)
 		return
 
-	def name(self):
-		return self.lg_name
-
-def MSD_frames(frames, fstart, fend, indices, refframe, plane):
-
-	#initialize an array to hold the ouptut
-	nfc = fend - fstart + 1
-	output = np.zeros((nfc,4))
-	# number of lipids in the selection
-	n_com = len(indices)
-	#initialize a running stats object to do the configuration averaging
-	drs_stat = RunningStats()
-	# initialize an np array to hold coordinates for the selection
-	# at the reference frame
-	com_ref = np.zeros((n_com,2))
-	ref_frame = frames[refframe]
-	count=0
-	# get the coordinates
-	for i in indices:
-		com_i = ref_frame.lipidcom[i].com_unwrap[plane]
-		com_ref[count]=com_i[:]
-		count+=1
-	time_ref = ref_frame.time
-	#print "nframes ",len(frames)
-	#print "process; fstart ",fstart," fend ",fend
-	#print "process; loop range "
-	#print range(fstart,(fend+1))
-	# now begin loop over the frames for this process		
-	for	f in range(fstart,(fend+1)):
-		# get the current frame
-		curr_frame = frames[f]
-		# get the coordinates for the selection at this frame
-		com_curr = np.zeros((n_com,2))
-		count=0
-		for i in indices:
-			com_i = curr_frame.lipidcom[i].com_unwrap[plane]
-			com_curr[count]=com_i[:]
-			count+=1
-		#current time
-		tc = curr_frame.time
-		dr = com_curr - com_ref
-		drs = dr*dr
-		#loop over the selections for this frame
-		for	val in drs:
-			drs_curr = val[:]	
-			drs_mag = drs_curr.sum()
-			drs_stat.Push(drs_mag)
-		#get the msd for the current selection
-		msdcurr = drs_stat.Mean()
-		devcurr = drs_stat.Deviation()
-		drs_stat.Reset()
-		findex = f-fstart
-		output[findex,0]=tc
-		output[findex,1]=msdcurr
-		output[findex,2]=devcurr
-		dt = tc - time_ref
-		DiffCon = 0.0
-		if f != 0:
-			DiffCon = msdcurr/(4.0*dt)
-		output[findex,3]=DiffCon
-	#	print "msdcurr ",msdcurr," DiffCon ",DiffCon
-	return output
-			
-
 ## this is the main class - the Membrane System (MemSys) object
-class COM_MemSys:
+class MemSys:
 	# pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
 	# optional - specify the plane that the membrane is in - default is xy with normal in z
-	def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False):
+	def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1):
 		#defaults - xy plane with z normal
 		ii=0
 		jj=1
@@ -336,24 +218,20 @@ class COM_MemSys:
 		self.clusters = [] # after 'CheckClustering' is called, the outersize len(self.clusters) should equal self.nframes
 		#initialize empty frame list
 		#self.frame=[]
-		self.frame = frames(prefix=frame_path,save=frame_save)
+		self.frame = frames
 		#loop over the frames
 		f=0
 		for frame in mda_traj[::fskip]:
-			print "doing frame ",frame.frame
 			#add the frame object for this frame
-			cframe = Frame(self.nlipids)
+			self.frame.append(Frame(self.nlipids))
 			# set the box dimensions and the time for this frame
-			cframe.SetBox(frame.dimensions[0:3])
-			cframe.SetTime(frame.time)
-			
+			self.frame[f].SetBox(frame.dimensions[0:3])
+			self.frame[f].SetTime(frame.time)
 			# loop over the residues (lipids) and get the centers of mass
 			r=0			
 			for res in mem_sel.residues:
-				cframe.lipidcom[r].extract(res)
+				self.frame[f].lipidcom[r].extract(res)
 				r+=1
-			#append the frame
-			self.frame.append(cframe)
 			f+=1
 		#get the number of frames from the trajectory
 		self.nframes = f
@@ -369,7 +247,7 @@ class COM_MemSys:
 		# unwrap the raw residue coordinates - then get the COMs
 		f=0
 		for frame in mda_traj[::fskip]:	
-			print "unwrapping frame ",frame.frame
+			#print "unwrapping frame ",frame.frame
 			currcoord = frame._pos[index]
 			if firstframe:
 				oldcoord = np.copy(currcoord)
@@ -379,12 +257,10 @@ class COM_MemSys:
 				wrapcoord = mda_wrap_coordinates(abc, currcoord, oldcoord)
 				frame._pos[index] = wrapcoord[:]
 				oldcoord = np.copy(wrapcoord)
-			r=0	
-			cframe = self.frame[f]		
+			r=0			
 			for res in mem_sel.residues:
-				cframe.lipidcom[r].extract(res, unwrap=True)
+				self.frame[f].lipidcom[r].extract(res, unwrap=True)
 				r+=1
-			self.frame[f]=cframe
 			f+=1			
 
 		# now we can assign the lipids to the leaflets 
@@ -416,16 +292,6 @@ class COM_MemSys:
 		return 'Membrane System with %s frames and %s lipids/components' % (self.nframes, self.nlipids) 
 	def __repr__(self):
 		return 'Membrane System with %s frames and %s lipids/components' % (self.nframes, self.nlipids)
-
-	def NumberOfUniqueGroups(self):
-		resnames = []
-		for leaflet in self.leaflets:
-			for group in leaflet.groups:
-				gname = group.name()
-				if gname not in resnames:
-					resnames.append(gname)
-		return len(resnames)
-
 	# function to compute the mean squared displace (msd) along with the diffusion constant of a group 
 	def CalcMSD(self, leaflet="both",group="all"):
 		indices = []
@@ -451,13 +317,14 @@ class COM_MemSys:
 		n_com = len(indices)
 		#store the coordinates of the selected LipidCOMs in a single numpy array
 		selcoords = np.zeros((self.nframes,n_com,2))
-		
-		for f in xrange(self.nframes): 
+		f=0
+		for fr in self.frame:
 			count=0
 			for i in indices:
-				com_curr = self.frame[f].lipidcom[i].com_unwrap[self.plane]
+				com_curr = fr.lipidcom[i].com_unwrap[self.plane]
 				selcoords[f,count]=com_curr[:]
 				count+=1
+			f+=1
 		
 		#initialize a numpy array to hold the msd for the selection		
 		msd = np.zeros((self.nframes, 6))
@@ -486,7 +353,6 @@ class COM_MemSys:
 			#get the msd for the current selection
 			msdcurr = drs_stat.Mean()
 			devcurr = drs_stat.Deviation()
-			drs_stat.Reset()
 			#dt = times[i]-times[0]
 			DiffCon = msdcurr/(2.0*dim*dt)
 			diff_stat.Push(DiffCon)
@@ -518,9 +384,8 @@ class COM_MemSys:
 		#dcoms = np.zeros(3)
 		f=0
 		
-		for f in xrange(self.nframes): 
+		for fr in self.frame:
 			n=0
-			fr = self.frame[f]
 			boxc = fr.box
 			boxc_xh = boxc[xi]/2.0
 			boxc_yh = boxc[yi]/2.0
@@ -623,7 +488,7 @@ class COM_MemSys:
 				zmaps[f,n,4]=zhim
 				zmaps[f,n,5]=distz
 				n+=1
-			
+			f+=1
 			#break
 		zavgs = np.zeros((self.nframes, 5))
 		zdtstat = RunningStats()	
@@ -648,7 +513,7 @@ class COM_MemSys:
 	# a simple cluster/chain analysis routine
 	def CheckClustering(self, leaflet="both",group="all", dist=10.0):
 		indices = []
-		
+		xyzout=False
 		#diffusion dimension - assume lateral so, dim=2
 		dim=2
 		if leaflet == "both":
@@ -686,8 +551,7 @@ class COM_MemSys:
 		#loop over frames		
 		
 		for f in xrange(self.nframes):
-			fr = self.frame[f]
-			ctime = fr.time
+			ctime = self.frame[f].time
 			clusters = []
 #			masterlistf = []
 #			masterlistf += masterlist
@@ -696,7 +560,7 @@ class COM_MemSys:
 			for i in indices:
 				masterlistf.append([i, False])
 #			print "master ",masterlistf
-			boxc=fr.box
+			boxc=self.frame[f].box
 			boxc_xh = boxc[xi]/2.0
 			boxc_yh = boxc[yi]/2.0
 			#print boxc
@@ -716,7 +580,7 @@ class COM_MemSys:
 				while i < len(neighborlist):
 					ele = neighborlist[i]
 					startn = ele
-					coms = fr.lipidcom[startn].com		
+					coms = self.frame[f].lipidcom[startn].com		
 					#get neighbors of the start
 					#mindex=0
 					for j in xrange(len(masterlistf)):
@@ -726,7 +590,7 @@ class COM_MemSys:
 					#	print "second incluster ",incluster
 						if not incluster:
 							ci = elem[0]
-							comc = fr.lipidcom[ci].com
+							comc = self.frame[f].lipidcom[ci].com
 							#dcom = comc-coms
 							dx = comc[xi]-coms[xi]
 							dy = comc[yi]-coms[yi]
@@ -797,7 +661,26 @@ class COM_MemSys:
 			print "Frame ",f
 			print "There are ",nclusters," clusters with an average size of ",avgsize
 			print "the largest cluster was ",maxi," and the smallest was ",mini
-
+#			if	f == 0:
+#				break
+			if xyzout:
+				# Open up the file to write to
+				xyz_name = "clusters_frame"+str(f)+".xyz"
+				xyz_out = open(xyz_name, "w")
+				nats=0
+				for cluster in clusters:
+					nats+=len(cluster)
+				xyz_out.write(str(nats))
+				xyz_out.write("\n")
+				xyz_out.write("clusters")
+				xyz_out.write("\n")
+				c=0
+				for cluster in clusters:
+					for index in cluster:
+							line = str(c)+" "+str(self.frame[f].lipidcom[index].com[0])+" "+str(self.frame[f].lipidcom[index].com[1])+" "+str(self.frame[f].lipidcom[index].com[2])
+							xyz_out.write(line)
+							xyz_out.write("\n")	
+					c+=1
 		return outdata	
 	#takes the cluster lists from self.clusters and gets the plane coordinates 
 	# need to call the 'CheckClustering' function before calling this one
@@ -858,15 +741,12 @@ class COM_MemSys:
 		#diffusion dimension - assume lateral so, dim=2
 		dim=2
 		do_leaflet = []
-		nlip = 0
 		if leaflet == "both":
 			do_leaflet.append('upper')
 			do_leaflet.append('lower')
-			nlip=self.nlipids
 		
 		elif leaflet == "upper" or leaflet == "lower":
 			do_leaflet.append(leaflet)
-			nlip = len(self.leaflets[leaflet])
 		else:
 			#unknown option--use default "both"
 			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
@@ -877,7 +757,7 @@ class COM_MemSys:
 		zi = self.norm
 		sub_fact = (2.0*np.pi/3.0 - np.sqrt(3.0)/2.0)
 		#initialize a numpy array to hold the msd for the selection		
-		areas = np.zeros((self.nframes, 5))
+		areas = np.zeros((self.nframes, 4))
 		#initialize a running stats object to do the averaging
 		area_stat = RunningStats()
 		n_leaflet = len(do_leaflet)
@@ -893,18 +773,13 @@ class COM_MemSys:
 			all_mem_leaflet[leaflets] = list(all_mem)
 			indices_leaflet[leaflets]=list(indices)
 			
-		
+		f=0
 		#loop over the frames
-		for f in xrange(self.nframes): 
-			fr = self.frame[f]
+		for fr in self.frame:
 			dt = fr.time
-			boxc=fr.box
+			boxc=self.frame[f].box
 			boxc_xh = boxc[xi]/2.0
 			boxc_yh = boxc[yi]/2.0
-			lat_area = boxc_xh*boxc_yh*4.0
-			if leaflet == 'both':
-				lat_area*=2.0
-			
 			area_stat_config = RunningStats()
 			#loop over the leaflets
 			for leaflets in do_leaflet:
@@ -912,7 +787,7 @@ class COM_MemSys:
 				all_mem = all_mem_leaflet[leaflets]
 				#loop over the group indices in this leaflet
 				for	index in indices:
-					comc = fr.lipidcom[index].com[:]
+					comc = self.frame[f].lipidcom[index].com[:]
 					rdist_min = 10000.0
 					#loop over the COMs of non group 
 					#get all the leaflet members
@@ -920,7 +795,7 @@ class COM_MemSys:
 					for a in all_mem:
 						#print "a ",a
 						if a != index:
-							comn = fr.lipidcom[a].com[:]
+							comn = self.frame[f].lipidcom[a].com[:]
 							dx = comc[xi]-comn[xi]
 							dy = comc[yi]-comn[yi]
 						
@@ -945,272 +820,45 @@ class COM_MemSys:
 			areas[f][1]=area_conf_avg
 			areas[f][2]=area_time_run
 			areas[f][3]=area_time_run_dev
-			areas[f][4]=lat_area/nlip
+			f+=1
 		return areas
-
-	# do Voronoi tesselation using the COMs as generators
-	def Tesselate(self, leaflet="both",group="all"):
-		indices = []
 		
-		#diffusion dimension - assume lateral so, dim=2
-		dim=2
-		if leaflet == "both":
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		elif leaflet == "upper":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-		elif leaflet == "lower":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-		else:
-			#unknown option--use default "both"
-			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
-			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		n_com = len(indices)
-
-		#print "there are ",len(indices)," members"
-		xi = self.plane[0]
-		yi = self.plane[1]
-		zi = self.norm
-		out_tess = []
-		for	f in xrange(self.nframes):
-			# get the current frame
-			curr_frame = self.frame[f]
-			# get the coordinates for the selection at this frame
-			com_curr = np.zeros((n_com,2))
-			count=0
-			for i in indices:
-				com_i = curr_frame.lipidcom[i].com_unwrap[self.plane]
-				com_curr[count]=com_i[:]
-				count+=1
-			vor = Voronoi(com_curr)
-			out_tess.append(vor)
-		return out_tess
-
-	# generate the step vectors of the center of mass
-	def StepVector(self, leaflet="both",group="all",fstart=0,fend=-1,fstep=1000):
-		indices = []
-		if fstart<0:
-			fstart+=self.nframes
-		if fend < 0:
-			fend+=self.nframes
-
-		#diffusion dimension - assume lateral so, dim=2
-		dim=2
-		if leaflet == "both":
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		elif leaflet == "upper":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-	
-		elif leaflet == "lower":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-			
-		else:
-			#unknown option--use default "both"
-			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
-			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		n_com = len(indices)
-
-		#print "there are ",len(indices)," members"
-		xi = self.plane[0]
-		yi = self.plane[1]
-		zi = self.norm
 		
-		vec_ends_out = []
-		for	f in xrange((fstart+fstep),fend+1,fstep):
-			fprev = f-fstep
-			# get the current frame
-			curr_frame = self.frame[f]
-			prev_frame = self.frame[fprev]
-			# get the coordinates for the selection at this frame
-			vec_ends = np.zeros((n_com,4))
-			#vec_ends = []
-			count=0
-			for i in indices:
-				com_i = curr_frame.lipidcom[i].com_unwrap[self.plane]
-				com_j = prev_frame.lipidcom[i].com_unwrap[self.plane]
-				vec_ends[count,0]=com_j[0]
-				vec_ends[count,1]=com_j[1]
-				vec_ends[count,2]=com_i[0] - com_j[0]
-				vec_ends[count,3]=com_i[1] - com_j[1]
-			#	vec_ends.append([com_j[0],com_j[0],com_i[0]-com_j[0],com_i[1]-com_j[1]])
-				count+=1
-			vec_ends_out.append(vec_ends)
-			
-		return vec_ends_out
 
-	# generate the step vectors of the center of mass
-	def StepVectorColors(self, leaflet="both",group="all"):
-		indices = []			
-		ngroups = 1
-		group_names = []
-		#diffusion dimension - assume lateral so, dim=2
-		dim=2
-		if leaflet == "both":
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-				curr_group_names = curr_leaf.GetGroupNames()
-				if group == 'all':
-					for gname in curr_group_names:
-						if gname not in group_names:
-							group_names.append(gname)
+	#Outputs the lipid com coordinates as a xyz trajectory file
+	def WriteXYZ(self, xyz_name, unwrap=False):
+		# Open up the file to write to
+		xyz_out = open(xyz_name, "w")
+		
+		for f in self.frame:
+			xyz_out.write(str(self.nlipids))
+			xyz_out.write("\n")
+			xyz_out.write("Membrane System")
+			xyz_out.write("\n")
+			l = 0
+			for com in f.lipidcom:
+				#write to file
+				
+				if	unwrap:
+					lc = "L"
+					if	bool(int(self.leaflet[l])):
+						lc = "U"
+					line = lc+str(com.type[0])+" "+str(com.com_unwrap[0])+" "+str(com.com_unwrap[1])+" "+str(com.com_unwrap[2])
 				else:
-					group_names.append(group)
-		elif leaflet == "upper":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-			curr_group_names = curr_leaf.GetGroupNames()
-			if group == 'all':
-				for gname in curr_group_names:
-					if gname not in group_names:
-						group_names.append(gname)
-			else:
-				group_names.append(group)
-				
-		elif leaflet == "lower":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-			curr_group_names = curr_leaf.GetGroupNames()
-			if group == 'all':
-				for gname in curr_group_names:
-					if gname not in group_names:
-						group_names.append(gname)
-			else:
-				group_names.append(group)
-				
-		else:
-			#unknown option--use default "both"
-			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
-			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-				curr_group_names = curr_leaf.GetGroupNames()
-				if group == 'all':
-					for gname in curr_group_names:
-						if gname not in group_names:
-							group_names.append(gname)
-				else:
-					group_names.append(group)
-				
-		n_com = len(indices)
-		ngroups = len(group_names)
-		colors = cm.rainbow(np.linspace(0, 1, ngroups))
-		#build color map
-		cmap = {}
-		n = 0
-		for name in group_names:
-			cmap[name] = colors[n]
-			n+=1
-		#pick a frame-just use first frame	
-		curr_frame = self.frame[0]
-		colors_out = np.zeros( (n_com,4))
-		count=0
-		for i in indices:
-			name_i = curr_frame.lipidcom[i].type
-			colors_out[count] = cmap[name_i]
-			count+=1
-			
-		return colors_out,cmap
+					line = str(com.type[0])+" "+str(com.com[0])+" "+str(com.com[1])+" "+str(com.com[2])
+				xyz_out.write(line)
+				xyz_out.write("\n")
+				l+=1
+		xyz_out.close()
 
-	# parallelized version of CalcMSD- using the multiprocessing module 
-	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2):			
 
-		indices = []
-		#diffusion dimension - assume lateral so, dim=2
-		dim=2
-		if leaflet == "both":
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		elif leaflet == "upper":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-		elif leaflet == "lower":
-			curr_leaf = self.leaflets[leaflet]
-			indices=curr_leaf.GetGroupIndices(group)
-		else:
-			#unknown option--use default "both"
-			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
-			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
-			for leaflets in self.leaflets:
-				curr_leaf = self.leaflets[leaflets]
-				indices+=curr_leaf.GetGroupIndices(group)
-		n_com = len(indices)
+#	def FilterList(list_in):
+#		l = len(list_in)-1
+#		for i, v in enumerate(reversed(list_in)):
+#			if v[1] == True:
+#				list_in.pop(l-i)
+#		return list_in
 
-		frame_ranges = []
-		total_frames = self.nframes
-		frames_per_proc_base = total_frames/nprocs
-		left_over = total_frames % (frames_per_proc_base * nprocs)
-		print "total frames ",total_frames
-		print "frames per proc ",frames_per_proc_base
-		print "left over ",left_over
-		#assign base ranges
-		for i in xrange(nprocs):
-			fs = i*frames_per_proc_base
-			fe = fs + frames_per_proc_base - 1
-			frame_ranges.append([fs,fe])
-		print "frame_ranges (pre-adjust):"	
-		print frame_ranges
-		#now adjust for leftovers - divide them "equally" over the processes
-		lo = left_over
-		while lo > 0:
-			for i in xrange(nprocs):
-				frame_ranges[i][1]+=1
-				for j in xrange(i+1,nprocs):
-					frame_ranges[j][0]+=1
-					frame_ranges[j][1]+=1
-				lo-=1
-				if lo == 0:
-					break
-		
-		print "nprocs ",nprocs
-		print "frame_ranges (post adjust): "
-		print frame_ranges
-		#initialize a numpy array to hold the msd for the selection		
-		msd = np.zeros((self.nframes, 4))
-		#
-		msd_frames = MSD_frames
-		#frames_local = getattr(self, 'frame')
-		#shelf_local = shelve.open(self.frame.fs_name,flag="r", protocol=2)
-		frames_local = par_frames(self.frame.nframes,self.frame.fs_name,self.frame.frame_shelf)
-		#frames_local = par_frames(self.frame.nframes,self.frame.fs_name)
-		#frames_local = par_frames(self.frame.nframes,self.frame.fs_name,shelf_local)
-		plane_local = self.plane
-		#create process pool
-		pool = mp.Pool(processes=nprocs)
-		results = [pool.apply_async(msd_frames,args=(frames_local,frame_ranges[i][0],frame_ranges[i][1],indices,0,plane_local)) for i in range(0,nprocs)]
-	#	print "results:"
-	#	print results
-		results_ordered = [p.get() for p in results]
-	#	print "results ordered: "
-	#	print results_ordered
-#		#collect results  into single array for return
-		i = 0
-	#	print "len(results_ordered) ",len(results_ordered)
-		for p in results_ordered:
-			fs = frame_ranges[i][0]
-			fe = frame_ranges[i][1]
-			#print fs, fe
-			#print msd[fs:(fe+1)].shape
-			#print p[:].shape
-			msd[fs:(fe+1)] = p[:]
-			i+=1
-		pool.close()
-		pool.join()
-		#shelf_local.close()
-		return msd 
-
+#	def FilterList(list_in):
+#		
+#		return [v for v in list_in if !v[1]]
