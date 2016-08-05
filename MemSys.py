@@ -30,6 +30,7 @@ class LipidCOM:
 		self.type="UNK"
 		self.com=np.zeros(3)
 		self.com_unwrap=np.zeros(3)
+		self.mass=1.0
 		return
 	#pass the MDAnalysis residue object - 
 	# optional param 'unwrap' - False is default - implies that the residue is in wrapped coordinates
@@ -60,6 +61,29 @@ class Frame:
 		return
 	def __len__(self):
 			return len(self.lipidcom)
+#	def COG(self,unwrapped=False):
+#		cog_out = np.zeros(3)
+#		for lipid in self.lipidcom:	
+#			if not unwrapped:
+#				cog_out+=lipid.com	
+#			else:
+#				cog_out+=lipid.com_unwrap
+#		cog_out/=len(self)
+#		return com_out
+	
+	def COM(self):
+		com_out = np.zeros(3)
+		total_mass = 0.0
+		for lipid in self.lipidcom:	
+			if not unwrapped:
+				com_out+=lipid.com*lipid.mass
+				total_mass+=lipid.mass	
+			else:
+				com_out+=lipid.com_unwrap*lipid.mass
+				total_mass+=lipid.mass	
+		com_out/=total_mass
+		return com_out
+
 #frame wrapper
 class frames:
 	_type_error ="instance of object MemSys.frames only excepts instances of MemSys.Frame"
@@ -358,6 +382,7 @@ class MemSys:
 			r=0			
 			for res in mem_sel.residues:
 				cframe.lipidcom[r].extract(res)
+				cframe.lipidcom[r].mass = res.total_mass()
 				r+=1
 			#append the frame
 			self.frame.append(cframe)

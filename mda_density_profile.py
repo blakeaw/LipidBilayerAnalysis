@@ -26,6 +26,10 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		a+=1
 	
 	nframes = len(trajectory)
+	if fend == (nframes-1) and fstart == (nframes-1):
+		fend+=1
+	if fend == fstart:
+		fend+=1
 	if fstart<0:
 		fstart+=nframes
 	if fend < 0:
@@ -101,10 +105,15 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 		a+=1
 
 	nframes = len(trajectory)
+	if fend == (nframes-1) and fstart == (nframes-1):
+		fend+=1
+	if fend == fstart:
+		fend+=1
 	if fstart<0:
 		fstart+=nframes
 	if fend < 0:
 		fend+=nframes+1
+
 	#get the maximum box dimension along axis
 	bzm=0.0
 	nframes = 0
