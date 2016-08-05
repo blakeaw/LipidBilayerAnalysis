@@ -1,4 +1,5 @@
-import math as math
+#import math as math
+import numpy as np
 #Running Statistics
 class RunningStats:
 	
@@ -31,7 +32,8 @@ class RunningStats:
 		else:
 			return 0.0
 	def Deviation(self):
-		dev = math.sqrt(self.Variance())
+		#dev = math.sqrt(self.Variance())
+		dev = np.sqrt(self.Variance())
 		return dev
 	def Reset(self):
 		self.n = 0

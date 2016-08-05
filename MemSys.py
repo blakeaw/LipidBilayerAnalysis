@@ -12,10 +12,17 @@ from RunningStats import *
 from pUnwrap import mda_wrap_coordinates
 
 
-#dictionary of elements and their valence electron counts - used for electron profile density
-valence_dict = {'H':1,'C':4,'N':5,'O':6,'P':5}
-
-
+def GenRunningAverage(1dnparray):
+	averager = RunningStats()
+	nele = len(1dnparray)
+	output = np.zeros((nele,2))
+	for i in xrange(nele):
+		averager.Push(1dnparray[i])
+		run_avg = averager.Mean()
+		run_dev = averager.Deviation()
+		output[i,0]=run_avg
+		output[i,1]=run_dev
+	return output
 #lipid center of mass object - stores the center of mass of a lipid/residue - stores both wrapped and unwrapped coordinates
 class LipidCOM:
 
@@ -304,7 +311,7 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
 			
 
 ## this is the main class - the Membrane System (MemSys) object
-class COM_MemSys:
+class MemSys:
 	# pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
 	# optional - specify the plane that the membrane is in - default is xy with normal in z
 	def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False):
@@ -460,11 +467,13 @@ class COM_MemSys:
 				count+=1
 		
 		#initialize a numpy array to hold the msd for the selection		
-		msd = np.zeros((self.nframes, 6))
+		msd = np.zeros((self.nframes, 7))
 		#initialize a running stats object to do the averaging
 		drs_stat = RunningStats()
 		#initialize a running stats object for the diffusion constant (frame/time average)
 		diff_stat = RunningStats()
+		#running stats object for time averaging
+		msd_stat = RunningStats()
 		#loop over the frames starting at index 1
 		#print comlist
 		#print len(comlist)
@@ -487,18 +496,22 @@ class COM_MemSys:
 			msdcurr = drs_stat.Mean()
 			devcurr = drs_stat.Deviation()
 			drs_stat.Reset()
+			msd_stat.Push(msdcurr)
+			msd_tavg = msd_stat.Mean()
+			msd_dev = msd_stat.Deviation()			
 			#dt = times[i]-times[0]
-			DiffCon = msdcurr/(2.0*dim*dt)
+			DiffCon = msd_tavg/(2.0*dim*dt)
 			diff_stat.Push(DiffCon)
 			#print "msdcurr ",msdcurr
 			#push to the msd array
 			
 			msd[i,0]=dt
 			msd[i,1]=msdcurr
-			msd[i,2]=devcurr
-			msd[i,3]=DiffCon
-			msd[i,4]=diff_stat.Mean()
-			msd[i,5]=diff_stat.Deviation()
+			msd[i,2]=msd_tavg
+			msd[i,3]=msd_dev
+			msd[i,4]=DiffCon
+			msd[i,5]=diff_stat.Mean()
+			msd[i,6]=diff_stat.Deviation()
 		#return msd array
 		return msd 
 
@@ -852,8 +865,9 @@ class COM_MemSys:
 			output.append([xcoord,ycoord,coord_color])
 		return output
 
-	# function to compute the mean squared displace (msd) along with the diffusion constant of a group 
-	def CalcAreaPerLipid(self, leaflet="both",group="all"):
+	# function to compute an approximation of the area per lipid of a group using 
+	# closest neighbor circles 
+	def CalcAreaPerLipid_ClosestNeighborCircle(self, leaflet="both",group="all"):
 		
 		#diffusion dimension - assume lateral so, dim=2
 		dim=2
@@ -946,6 +960,59 @@ class COM_MemSys:
 			areas[f][2]=area_time_run
 			areas[f][3]=area_time_run_dev
 			areas[f][4]=lat_area/nlip
+		return areas
+
+	# function to compute the area per lipid using the lateral box sizes and numbers of lipids:
+	def CalcAreaPerLipid_Box(self, leaflet="both"):
+		
+		#diffusion dimension - assume lateral so, dim=2
+		dim=2
+		do_leaflet = []
+		nlip = 0
+		if leaflet == "both":
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+			nlip = []
+			for leaflets in do_leaflet:
+				nlip.append(float(len(self.leaflets[leaflets]))
+		
+		elif leaflet == "upper" or leaflet == "lower":
+			do_leaflet.append(leaflet)
+			nlip = len(self.leaflets[leaflet])
+		else:
+			#unknown option--use default "both"
+			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
+			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
+			
+		xi = self.plane[0]
+		yi = self.plane[1]
+		zi = self.norm
+		
+		#initialize a numpy array to hold the msd for the selection		
+		areas = np.zeros((self.nframes, 4))
+		#initialize a running stats object to do the averaging
+		area_stat = RunningStats()
+		n_leaflet = len(do_leaflet)
+			
+		
+		#loop over the frames
+		for f in xrange(self.nframes): 
+			fr = self.frame[f]
+			dt = fr.time
+			boxc_xh = boxc[xi]/2.0
+			boxc_yh = boxc[yi]/2.0
+			lat_area = boxc_xh*boxc_yh*4.0
+			area_per_lip = lat_area/nlip
+			if leaflet == 'both':
+				area_per_lip = (lat_area/2.0)*( (nlip[0]+nlip[1])/(nlip[0]*nlip[1]))
+			
+			area_stat.Push(area_per_lipid)
+			area_time_run = area_stat.Mean()
+			area_time_run_dev = area_stat.Deviation()
+			areas[f][0]=dt
+			areas[f][1]=area_per_lipid
+			areas[f][2]=area_time_run
+			areas[f][3]=area_time_run_dev
 		return areas
 
 	# do Voronoi tesselation using the COMs as generators
@@ -1127,7 +1194,7 @@ class COM_MemSys:
 		return colors_out,cmap
 
 	# parallelized version of CalcMSD- using the multiprocessing module 
-	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2):			
+	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2,timeaverage=True):			
 
 		indices = []
 		#diffusion dimension - assume lateral so, dim=2
@@ -1211,6 +1278,18 @@ class COM_MemSys:
 			i+=1
 		pool.close()
 		pool.join()
+		#initialize a numpy array to hold the msd for the selection		
+		msd_tavg = msd
+		if timeaverage:
+			#regenerate the container
+			msd_tavg = np.zeros((self.nframes, 6))
+			# get the running time average
+			tavg_msd = GetRunningAverage(msd[:,1])
+			#slice together the values
+			msd_tavg[:,0:3]=msd[:,:]
+			msd_tavg[:,4:5]=tavg_msd[:,:]
+			
+			
 		#shelf_local.close()
-		return msd 
+		return msd_tavg
 
