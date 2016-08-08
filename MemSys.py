@@ -9,20 +9,21 @@ from scipy.spatial import Voronoi
 #import my running stats class
 from RunningStats import *
 # import the coordinate wrapping function--for unwrapping
-from pUnwrap import mda_wrap_coordinates
+from pUnwrap import mda_wrap_coordinates,mda_wrap_coordinates_parallel
 
 
-def GenRunningAverage(1dnparray):
+def GenRunningAverage(onednparray):
 	averager = RunningStats()
-	nele = len(1dnparray)
+	nele = len(onednparray)
 	output = np.zeros((nele,2))
 	for i in xrange(nele):
-		averager.Push(1dnparray[i])
+		averager.Push(onednparray[i])
 		run_avg = averager.Mean()
 		run_dev = averager.Deviation()
 		output[i,0]=run_avg
 		output[i,1]=run_dev
 	return output
+
 #lipid center of mass object - stores the center of mass of a lipid/residue - stores both wrapped and unwrapped coordinates
 class LipidCOM:
 
@@ -338,7 +339,7 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
 class MemSys:
 	# pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
 	# optional - specify the plane that the membrane is in - default is xy with normal in z
-	def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False):
+	def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False,nprocs=1):
 		#defaults - xy plane with z normal
 		ii=0
 		jj=1
@@ -351,6 +352,10 @@ class MemSys:
 			ii=0
 			jj=2
 			kk=1
+		#parallelize loading -- currently just applies to unwrapping
+		parallel=False
+		if nprocs>1:
+			parallel=True
 		#store the indices of the plane directions
 		self.plane = [ii, jj]
 		# store the index of the normal direction
@@ -401,6 +406,7 @@ class MemSys:
 		# unwrap the raw residue coordinates - then get the COMs
 		f=0
 		for frame in mda_traj[::fskip]:	
+			#first we unwrapp
 			print "unwrapping frame ",frame.frame
 			currcoord = frame._pos[index]
 			if firstframe:
@@ -408,9 +414,16 @@ class MemSys:
 				firstframe = False
 			else:
 				abc = frame.dimensions[0:3]
-				wrapcoord = mda_wrap_coordinates(abc, currcoord, oldcoord)
+				if parallel:
+					wrapcoord = mda_wrap_coordinates_parallel(abc, currcoord, oldcoord,nprocs=nprocs)
+				else:
+					wrapcoord = mda_wrap_coordinates(abc, currcoord, oldcoord)
 				frame._pos[index] = wrapcoord[:]
 				oldcoord = np.copy(wrapcoord)
+			#now we need to adjust for the center of mass motion of the membrane -- for simplicity set all frames to (0,0,0)
+			# to remove center of mass motion of the membrane
+			mem_com = mem_sel.center_of_mass()
+			frame._pos[index] -= mem_com
 			r=0	
 			cframe = self.frame[f]		
 			for res in mem_sel.residues:
@@ -999,9 +1012,12 @@ class MemSys:
 			do_leaflet.append('lower')
 			nlip = []
 			for leaflets in do_leaflet:
-				nlip.append(float(len(self.leaflets[leaflets]))
+				nlip.append(float(len(self.leaflets[leaflets])))
 		
-		elif leaflet == "upper" or leaflet == "lower":
+		elif leaflet == "upper":
+			do_leaflet.append(leaflet)
+			nlip = len(self.leaflets[leaflet])
+		elif leaflet == "lower":
 			do_leaflet.append(leaflet)
 			nlip = len(self.leaflets[leaflet])
 		else:
@@ -1309,10 +1325,10 @@ class MemSys:
 			#regenerate the container
 			msd_tavg = np.zeros((self.nframes, 6))
 			# get the running time average
-			tavg_msd = GetRunningAverage(msd[:,1])
+			tavg_msd = GenRunningAverage(msd[:,1])
 			#slice together the values
-			msd_tavg[:,0:3]=msd[:,:]
-			msd_tavg[:,4:5]=tavg_msd[:,:]
+			msd_tavg[:,0:4]=msd[:,:]
+			msd_tavg[:,4:6]=tavg_msd[:,:]
 			
 			
 		#shelf_local.close()
