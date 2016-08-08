@@ -24,6 +24,23 @@ def GenRunningAverage(onednparray):
 		output[i,1]=run_dev
 	return output
 
+def lipid_com_extract(frame, mem_sel, start, stop):
+	#print "start ",start," stop ",stop
+	nres = (stop - start)+1
+	rcom = np.zeros((nres,3))
+	rmass = np.zeros(nres)
+	rnames = []
+	#while frame:
+	residues = mem_sel.residues
+	for i in xrange(start,(stop+1)):
+		ic = i - start
+		rcom[ic]=residues[i].center_of_mass()
+		rmass[ic]=residues[i].total_mass()
+		rnames.append(residues[i].resname)
+		#break
+	#print rcom
+	return list([rcom,rmass,rnames])
+
 #lipid center of mass object - stores the center of mass of a lipid/residue - stores both wrapped and unwrapped coordinates
 class LipidCOM:
 
@@ -45,6 +62,16 @@ class LipidCOM:
 		
 		self.type=mda_residue.resname
 		return
+	def setcom(self, com, unwrap=False):
+		if	unwrap:
+			self.com_unwrap = com[:]
+		else:
+			self.com = com[:]
+		return
+	def settype(self, resname):
+			self.type=resname	
+			return
+		
 # a frame object 
 class Frame:
 	def __init__(self, nlipids):
@@ -384,11 +411,77 @@ class MemSys:
 			cframe.SetTime(frame.time)
 			
 			# loop over the residues (lipids) and get the centers of mass
-			r=0			
-			for res in mem_sel.residues:
-				cframe.lipidcom[r].extract(res)
-				cframe.lipidcom[r].mass = res.total_mass()
-				r+=1
+			if parallel:
+				residues = mem_sel.residues
+				nres = len(mem_sel.residues)
+				res_coms = np.zeros((nres,3))
+				res_masses = np.zeros(nres)
+				res_names = []
+				res_ranges = []
+				res_per_proc_base = nres/nprocs
+				left_over = nres % (res_per_proc_base * nprocs)
+				#print "total res ",nres
+				#print "res per proc ",res_per_proc_base
+				#print "left over ",left_over
+				#assign base ranges
+				for i in xrange(nprocs):
+					fs = i*res_per_proc_base
+					fe = fs + res_per_proc_base - 1
+					res_ranges.append([fs,fe])
+				#print "res_ranges (pre-adjust):"	
+				#print res_ranges
+				#now adjust for leftovers - divide them "equally" over the processes
+				lo = left_over
+				while lo > 0:
+					for i in xrange(nprocs):
+						res_ranges[i][1]+=1
+						for j in xrange(i+1,nprocs):
+							res_ranges[j][0]+=1
+							res_ranges[j][1]+=1
+						lo-=1
+						if lo == 0:
+							break
+		
+				#print "nprocs ",nprocs
+				#print "res_ranges (post adjust): "
+				#print res_ranges
+				
+				#the function to pass to the pool
+				extract = lipid_com_extract
+				
+				pool = mp.Pool(processes=nprocs)
+				results = [pool.apply_async(extract,args=(frame,mem_sel,res_ranges[i][0],res_ranges[i][1])) for i in range(0,nprocs)]
+				#print "results:"
+				#print results[0].get()
+				results_ordered = [p.get() for p in results]
+			#	print "results ordered: "
+			#	print results_ordered
+		#		#collect results  into single array for return
+				i = 0
+			#	print "len(results_ordered) ",len(results_ordered)
+				for p in results_ordered:
+					fs = res_ranges[i][0]
+					fe = res_ranges[i][1]
+					#print fs, fe
+					#print msd[fs:(fe+1)].shape
+					#print p[:].shape
+					res_coms[fs:(fe+1)] = p[0][:]
+					res_masses[fs:(fe+1)] = p[1][:]
+					res_names+=p[2]
+					i+=1
+				pool.close()
+				pool.join()
+				for r in xrange(nres):
+					cframe.lipidcom[r].setcom(res_coms[r])
+					cframe.lipidcom[r].mass = res_masses[r]
+					cframe.lipidcom[r].settype(res_names[r])
+				
+			else:
+				r=0			
+				for res in mem_sel.residues:
+					cframe.lipidcom[r].extract(res)
+					cframe.lipidcom[r].mass = res.total_mass()
+					r+=1
 			#append the frame
 			self.frame.append(cframe)
 			f+=1
