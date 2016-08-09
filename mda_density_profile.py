@@ -37,7 +37,7 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 	#get the maximum box dimension along axis
 	bzm=0.0
 	nframes = 0
-	sel_z_avg=0.0
+	sel_z = []
 	for frame in trajectory[fstart:fend:fstep]:
 		bzc = frame.dimensions[dir_ind]
 		if bzc>bzm:
@@ -46,12 +46,19 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		if refsel is not None:
 			ref_com = refsel.center_of_mass()
 			ref_sel_z = ref_com[dir_ind]
-			sel_z_avg+=ref_sel_z
+			sel_z.append(-ref_sel_z)
 		nframes+=1
+	shiftzmax = 0.0
+	shiftzmin = 0.0
 	if refsel is not None:
-		reference=sel_z_avg/nframes
+		#reference=sel_z_avg/nframes
+		shiftzmax = min(sel_z)
+		shiftzmin = max(sel_z)
 	#build the profile axis
-	edges = np.linspace(0.0,(bzm),(nbins+1),endpoint=True)
+	minz = 0.0+shiftzmin
+	maxz = bzm+shiftzmax
+	#print "minz ",minz," maxz ",maxz
+	edges = np.linspace(minz,maxz,(nbins+1),endpoint=True)
 	incr = edges[1]-edges[0]
 	incr_h = incr/2.0
 	centers = np.zeros(nbins)
@@ -61,7 +68,12 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		centers[j]=edges[j]+incr_h
 		
 	counts = np.zeros(nbins)
-	
+	#print sel_z
+	if refsel is None:
+		sel_z = np.zeros(nframes)
+	else:
+		sel_z = np.array(sel_z)
+	f=0
 	for frame in trajectory[fstart:fend:fstep]:
 		
 		bx = frame.dimensions[lat_ind[0]]
@@ -70,7 +82,9 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		counts_f = np.zeros(nbins)
 		sel_pos = frame._pos[indices]
 		zpos = sel_pos[:,dir_ind]
-		push_index = zpos/incr
+		sel_z_curr = sel_z[f]
+		zpos+= sel_z_curr
+		push_index = (zpos-minz)/incr
 		j=0
 		for i in push_index:
 			ii = int(np.floor(i))
@@ -82,6 +96,7 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 			j+=1
 		counts_f/=binvolume
 		counts+=counts_f
+		f+=1
 	counts/=nframes
 	centers-=reference
 	return centers,counts
@@ -117,7 +132,7 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 	#get the maximum box dimension along axis
 	bzm=0.0
 	nframes = 0
-	sel_z_avg=0.0
+	sel_z = []
 	for frame in trajectory[fstart:fend:fstep]:
 		bzc = frame.dimensions[dir_ind]
 		if bzc>bzm:
@@ -126,12 +141,18 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 		if refsel is not None:
 			ref_com = refsel.center_of_mass()
 			ref_sel_z = ref_com[dir_ind]
-			sel_z_avg+=ref_sel_z
+			sel_z.append(-ref_sel_z)
 		nframes+=1
+	shiftzmax = 0.0
+	shiftzmin = 0.0
 	if refsel is not None:
-		reference=sel_z_avg/nframes
+		#reference=sel_z_avg/nframes
+		shiftzmax = min(sel_z)
+		shiftzmin = max(sel_z)
 	#build the profile axis
-	edges = np.linspace(0.0,(bzm),(nbins+1),endpoint=True)
+	minz = 0.0+shiftzmin
+	maxz = bzm+shiftzmax
+	edges = np.linspace(minz,maxz,(nbins+1),endpoint=True)
 	incr = edges[1]-edges[0]
 	incr_h = incr/2.0
 	centers = np.zeros(nbins)
@@ -141,7 +162,11 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 		centers[j]=edges[j]+incr_h
 		
 	counts = np.zeros(nbins)
-	
+	if refsel is None:
+		sel_z = np.zeros(nframes)
+	else:
+		sel_z = np.array(sel_z)
+	f=0
 	for frame in trajectory[fstart:fend:fstep]:
 		
 		bx = frame.dimensions[lat_ind[0]]
@@ -150,7 +175,9 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 		counts_f = np.zeros(nbins)
 		sel_pos = frame._pos[indices]
 		zpos = sel_pos[:,dir_ind]
-		push_index = zpos/incr
+		sel_z_curr = sel_z[f]
+		zpos+= sel_z_curr
+		push_index = (zpos-minz)/incr
 		j=0
 		for i in push_index:
 			ii = int(np.floor(i))
@@ -162,6 +189,7 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 			j+=1
 		counts_f/=binvolume
 		counts+=counts_f
+		f+=1
 	counts/=nframes
 	centers-=reference
 	return centers,counts
