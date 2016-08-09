@@ -177,6 +177,34 @@ def mda_unwrap(universe, out_file_name):
 			frame._pos[:] = wrapcoord[:]
 			writer.write(universe.atoms)
 
+
+def mda_unwrap_parallel(universe, out_file_name,nprocs=2):
+	frames = universe.trajectory
+	print "unwrapping coordinates - ouput is ",out_file_name
+	nframes=len(frames)
+	# Setup writer to write aligned dcd file
+	writer = mda.coordinates.DCD.DCDWriter(
+		out_file_name, frames.n_atoms,
+		0,
+		1,
+		frames.dt,
+		remarks='Unwrapped trajectory')
+	natoms = frames.n_atoms
+	oldcoord = np.zeros((natoms,3), dtype=np.double)
+	firstframe = True
+	for frame in frames:
+		currcoord = frame._pos[:]
+		if firstframe:
+			oldcoord = currcoord
+			firstframe = False
+			writer.write(universe.atoms)
+		else:
+			abc = frame.dimensions[0:3]
+			wrapcoord = mda_wrap_coordinates_parallel(abc, currcoord, oldcoord,nprocs=2)
+			frame._pos[:] = wrapcoord[:]
+			writer.write(universe.atoms)
+
+
 #def wrap_coordinates(abc, coord, refcoord):
 #	wrapcoord = coord.copy()
 #	# box vectors (assuming rectangular)
