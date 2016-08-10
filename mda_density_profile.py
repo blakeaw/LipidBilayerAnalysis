@@ -26,6 +26,9 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		a+=1
 	
 	nframes = len(trajectory)
+	#adjust the end point for slicing
+	if fend != -1:
+		fend+=1
 	if fend == (nframes-1) and fstart == (nframes-1):
 		fend+=1
 	if fend == fstart:
@@ -34,6 +37,7 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 		fstart+=nframes
 	if fend < 0:
 		fend+=nframes+1
+
 	#get the maximum box dimension along axis
 	bzm=0.0
 	nframes = 0
@@ -120,6 +124,9 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 		a+=1
 
 	nframes = len(trajectory)
+	#adjust the end point for slicing
+	if fend != -1:
+		fend+=1
 	if fend == (nframes-1) and fstart == (nframes-1):
 		fend+=1
 	if fend == fstart:
@@ -193,5 +200,46 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
 	counts/=nframes
 	centers-=reference
 	return centers,counts
+
+class SizeError(Exception):
+	def __init__(self):
+		self.value = "Sizes of input arrays are not the same!"
+	def __str__(self):
+		return repr(self.value) 
 	
+	
+def GetIntersections(x, y1, y2):
+
+	nx = len(x)
+	ny1 = len(y1)
+	ny2 = len(y2)
+	if nx != ny1 or nx != ny2 or ny1 != ny2:
+		raise SizeError() 
+	yh = np.zeros(nx)
+	yl = np.zeros(nx)
+	if y1[0]<y2[0]:
+		yl = y1
+		yh = y2
+	else:
+		yl = y2
+		yh = y1
+	output = []	
+	for i in xrange(1,nx):
+		ylc = yl[i]
+		ylp = yl[i-1]
+		yhp = yh[i-1]
+		yhc = yh[i]
+		if ylc > yhc and ylp < yhp:
+			#get the intersection
+			xc = (x[i]+x[i-1])*0.50
+			yc = (ylc+yhp+yl[i-1]+yh[i])*0.250
+			#now flip the low and high arrays	
+			temp = yl
+			yl = yh
+			yh = temp
+					 
+			output.append([xc,yc])
+
+	return output
+
 
