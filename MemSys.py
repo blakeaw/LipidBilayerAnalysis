@@ -1235,7 +1235,7 @@ class MemSys:
 		return colors_out,cmap
 
 	# parallelized version of CalcMSD- using the multiprocessing module 
-	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2,timeaverage=True):			
+	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2,timeaverage=False):			
 
 		indices = []
 		#diffusion dimension - assume lateral so, dim=2
