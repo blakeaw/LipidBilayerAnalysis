@@ -6,6 +6,7 @@ import os, sys, shutil
 import shelve
 import multiprocessing as mp
 from scipy.spatial import Voronoi
+from scipy.spatial import Delaunay
 #import copy
 
 #import my running stats class
@@ -1212,7 +1213,7 @@ class MemSys:
 		return areas
 
 	# do Voronoi tesselation using the COMs as generators
-	def Tesselate(self, leaflet="both",group="all"):
+	def VoronoiTesselate(self, leaflet="both",group="all"):
 		indices = []
 		
 		#diffusion dimension - assume lateral so, dim=2
@@ -1252,8 +1253,54 @@ class MemSys:
 				com_curr[count]=com_i[:]
 				count+=1
 			vor = Voronoi(com_curr)
+			#out_tess.append([com_curr[:,0],com_curr[:,1],vor])
 			out_tess.append(vor)
 		return out_tess
+
+	# do Delauny tesselation using the COMs as generators
+	def DelaunayTesselate(self, leaflet="both",group="all"):
+		indices = []
+		
+		#diffusion dimension - assume lateral so, dim=2
+		dim=2
+		if leaflet == "both":
+			for leaflets in self.leaflets:
+				curr_leaf = self.leaflets[leaflets]
+				indices+=curr_leaf.GetGroupIndices(group)
+		elif leaflet == "upper":
+			curr_leaf = self.leaflets[leaflet]
+			indices=curr_leaf.GetGroupIndices(group)
+		elif leaflet == "lower":
+			curr_leaf = self.leaflets[leaflet]
+			indices=curr_leaf.GetGroupIndices(group)
+		else:
+			#unknown option--use default "both"
+			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
+			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
+			for leaflets in self.leaflets:
+				curr_leaf = self.leaflets[leaflets]
+				indices+=curr_leaf.GetGroupIndices(group)
+		n_com = len(indices)
+
+		#print "there are ",len(indices)," members"
+		xi = self.plane[0]
+		yi = self.plane[1]
+		zi = self.norm
+		out_tess = []
+		for	f in xrange(self.nframes):
+			# get the current frame
+			curr_frame = self.frame[f]
+			# get the coordinates for the selection at this frame
+			com_curr = np.zeros((n_com,2))
+			count=0
+			for i in indices:
+				com_i = curr_frame.lipidcom[i].com_unwrap[self.plane]
+				com_curr[count]=com_i[:]
+				count+=1
+			tri = Delaunay(com_curr)
+			out_tess.append([com_curr[:,0],com_curr[:,1],tri])
+		return out_tess
+
 
 	# generate the step vectors of the center of mass
 	def StepVector(self, leaflet="both",group="all",fstart=0,fend=-1,fstep=1000):
