@@ -2,10 +2,15 @@ import numpy as np
 
 #dictionary of elements and their valence electron counts - used for electron profile density
 valence_dict = {'H':1,'C':4,'N':5,'O':6,'P':5}
+#dictionary of elements and their atomic numbers - used for electron profile density
+Z_dict = {'H':1,'C':6,'N':7,'O':8,'P':15}
 
-def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis='z',nbins=100,reference=0.0,refsel=None):
+def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis='z',nbins=100,reference=0.0,refsel=None,valence=True):
 	lat_ind = [0,1]
 	dir_ind = 2
+	ec_dict = valence_dict
+	if not valence:
+		ec_dict = Z_dict 
 	if	axis is 'x':
 		dir_ind=0
 		lat_ind=[1,2]
@@ -19,9 +24,9 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
 	a=0
 	for atom in mda_selection:
 		element = atom.name[0]
-		valence = valence_dict[element]
+		electrons = ec_dict[element]
 		partial = atom.charge
-		total = valence-partial
+		total = electrons-partial
 		charges[a]=total
 		a+=1
 	
