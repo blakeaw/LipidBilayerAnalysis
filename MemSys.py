@@ -1389,6 +1389,53 @@ class MemSys:
 			
 		return colors_out,cmap
 
+	def RemoveLeafletCOMmotion(self,leaflet="both"):
+		do_leaflet = []
+		nlip = 0
+		if leaflet == "both":
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+			nlip = []
+			for leaflets in do_leaflet:
+				nlip.append(float(len(self.leaflets[leaflets])))
+		
+		elif leaflet == "upper":
+			do_leaflet.append(leaflet)
+			nlip = len(self.leaflets[leaflet])
+		elif leaflet == "lower":
+			do_leaflet.append(leaflet)
+			nlip = len(self.leaflets[leaflet])
+		else:
+			#unknown option--use default "both"
+			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the ",self.name," leaflet"
+			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+		leaf_indices = {}
+
+		for leaf in do_leaflet:
+			leaf_indices[leaf]=list(self.leaflets[leaf].GetMemberIndices())
+		
+		
+		for f in xrange(self.nframes):
+			fr = self.frame[f]
+			
+			for leaf in do_leaflet:
+				indices=leaf_indices[leaf]
+				#get the leaflet COM
+				lcom = np.zeros(3)
+				masst = 0.0
+				for i in indices:
+					lcom+=(fr.lipidcom[i].com_unwrap*fr.lipidcom[i].mass)
+					masst+=fr.lipidcom[i].mass
+				lcom/=masst
+				for i in indices:
+					fr.lipidcom[i].com_unwrap-=lcom
+			self.frame[f]=fr
+		return
+
+	############### multiprocessor parallelized versions of calculation member functions
+
 	# parallelized version of CalcMSD- using the multiprocessing module 
 	def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2,timeaverage=False):			
 
