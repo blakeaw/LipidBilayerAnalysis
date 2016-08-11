@@ -6,6 +6,8 @@ import os, sys, shutil
 import shelve
 import multiprocessing as mp
 from scipy.spatial import Voronoi
+#import copy
+
 #import my running stats class
 from RunningStats import *
 # import the coordinate wrapping function--for unwrapping
@@ -260,6 +262,7 @@ class Leaflet:
 
 	def GetGroupNames(self):
 		return [group.lg_name for group in self.groups]
+
 		
 class LipidGroup:
 	def __init__(self, name):
@@ -333,7 +336,157 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
 		output[findex,3]=DiffCon
 	#	print "msdcurr ",msdcurr," DiffCon ",DiffCon
 	return output
+
+#function to compute the thickness of the membrane (in the normal direction). The algorithm is based on  
+# the GridMAT-MD bilayer thickness calculation (except without the gridding procedure) 
+def Thickness_frames(frames, fstart, fend, leaflets, nlipids, plane, norm):
+	#upper_match = []
+	#lower_match = []
+	xi = plane[0]
+	yi = plane[1]
+	zi = norm
+	comcup = np.zeros(3)
+	comclo = np.zeros(3)
+	dcom = np.zeros(3)
+	nfc = fend - fstart + 1
+	nlc = nlipids
+	zdists = np.zeros((nfc, nlc, 1))
+	zmaps = np.zeros((nfc, nlc, 6))
+	#dcoms = np.zeros(3)
+	f=0
+	times = np.zeros(nfc)
+	
+	for	f in range(fstart,(fend+1)):
+		n=0
+		fr = frames[f]
+		boxc = fr.box
+		boxc_xh = boxc[xi]/2.0
+		boxc_yh = boxc[yi]/2.0
+		dt = fr.time
+		findex = f-fstart
+		times[findex]=dt
+		for memu in leaflets['upper'].members:
+			idu = memu[0]
+			comcup = fr.lipidcom[idu].com
+			distxy = 10000.0
+			distz = 0.0
+			mindex = 0
+			zlom = 0.0
+			zhim = 0.0
+			xavgm = 0.0
+			yavgm = 0.0
+			for meml in leaflets['lower'].members:
+				idl = meml[0]
+				comclo = fr.lipidcom[idl].com
+				dcom = comcup-comclo
+				dx = dcom[xi]
+				dy = dcom[yi]
+				dz = dcom[zi]
+				#Minimum image -- coordinates must be pre-wrapped 
+				if np.absolute(dx) > boxc_xh:
+					dx = boxc[xi] - np.absolute(comcup[xi]-boxc_xh) - np.absolute(comclo[xi]-boxc_xh)
+				if np.absolute(dy) > boxc_yh:
+					dy = boxc[yi] - np.absolute(comcup[yi]-boxc_yh) - np.absolute(comclo[yi]-boxc_yh)
+				rxy = np.sqrt(dx**2+dy**2)
+				#get 4d map values
+				comavg = (comcup+comclo)/2.0
+				xavg = comavg[xi]
+				yavg = comavg[yi]
+				zlo = comclo[zi]
+				zhi = comcup[zi]
+				if	rxy<distxy:
+					distxy=rxy
+					distz = np.absolute(dz)
+					mindex=meml
+					xavgm = xavg
+					yavgm = yavg
+					zlom = zlo
+					zhim = zhi
+					
+			#upper_match.append([mindex,distz])
+			#print "n ",n," xvg ", xavgm," yvg ", yavgm
 			
+			zdists[findex,n]=distz
+			#maps
+			zmaps[findex,n,0]=dt
+			zmaps[findex,n,1]=xavgm
+			zmaps[findex,n,2]=yavgm
+			zmaps[findex,n,3]=zlom
+			zmaps[findex,n,4]=zhim
+			zmaps[findex,n,5]=distz
+			
+			n+=1
+		for meml in leaflets['lower'].members:
+			idl = meml[0]
+			comclo = fr.lipidcom[idl].com
+			distxy = 10000.0
+			distz = 0.0
+			mindex = 0
+			zlom = 0.0
+			zhim = 0.0
+			xavgm = 0.0
+			yavgm = 0.0
+			for memu in leaflets['upper'].members:
+				idu = memu[0]
+				comcup = fr.lipidcom[idu].com
+				dcom = comclo-comcup
+				dx = dcom[xi]
+				dy = dcom[yi]
+				dz = dcom[zi]
+				#Minimum image -- coordinates must be pre-wrapped 
+				if np.absolute(dx) > boxc_xh:
+					dx = boxc[xi] - np.absolute(comclo[xi]-boxc_xh) - np.absolute(comcup[xi]-boxc_xh)
+				if np.absolute(dy) > boxc_yh:
+					dy = boxc[yi] - np.absolute(comclo[yi]-boxc_yh) - np.absolute(comcup[yi]-boxc_yh)
+				rxy = np.sqrt(dx**2+dy**2)
+				#get 4d map values
+				comavg = (comcup+comclo)/2.0
+				xavg = comavg[xi]
+				yavg = comavg[yi]
+				zlo = comclo[zi]
+				zhi = comcup[zi]
+				if	rxy<distxy:
+					distxy=rxy
+					distz = np.absolute(dz)
+					mindex=meml
+					xavgm = xavg
+					yavgm = yavg
+					zlom = zlo
+					zhim = zhi
+			#upper_match.append([mindex,distz])
+			#print "n ",n," xvg ", xavgm," yvg ", yavgm
+			zdists[findex,n]=distz
+			#maps
+			zmaps[findex,n,0]=dt
+			zmaps[findex,n,1]=xavgm
+			zmaps[findex,n,2]=yavgm
+			zmaps[findex,n,3]=zlom
+			zmaps[findex,n,4]=zhim
+			zmaps[findex,n,5]=distz
+			n+=1
+		
+		#break
+	zavgs = np.zeros((nfc, 3))
+	zdtstat = RunningStats()	
+	for fr in xrange(nfc):
+		currtime = times[fr]
+		dt = currtime 
+		curr = zdists[fr,:]
+		zavgcurr = curr.mean()			
+		zdevcurr = curr.std()
+#		zdtstat.Push(zavgcurr)
+#		zdtcurr = zdtstat.Mean()
+#		zdtdcurr = zdtstat.Deviation()
+		zavgs[fr,0]=dt
+		zavgs[fr,1]=zavgcurr
+		zavgs[fr,2]=zdevcurr
+#		zavgs[fr,3]=zdtcurr
+#		zavgs[fr,4]=zdtdcurr
+	out = [zavgs,zmaps]
+	return out
+	#return zavgs
+	#return zmaps
+		
 
 ## this is the main class - the Membrane System (MemSys) object
 class MemSys:
@@ -470,6 +623,8 @@ class MemSys:
 				if gname not in resnames:
 					resnames.append(gname)
 		return len(resnames)
+	#def LeafletCOM(leaflet_name,frame_num):
+		
 
 	# function to compute the mean squared displace (msd) along with the diffusion constant of a group 
 	def CalcMSD(self, leaflet="both",group="all"):
@@ -1333,4 +1488,90 @@ class MemSys:
 			
 		#shelf_local.close()
 		return msd_tavg
+	#function to compute the thickness of the membrane (in the normal direction). The algorithm is based on  
+	# the GridMAT-MD bilayer thickness calculation (except without the gridding procedure) 
+	def CalcMembraneThickness_parallel(self,nprocs=2,timeaverage=True):
+		nlip = self.nlipids
+		comcup = np.zeros(3)
+		comclo = np.zeros(3)
+		dcom = np.zeros(3)
+		zdists = np.zeros((self.nframes, 3))
+		zmaps = np.zeros((self.nframes, self.nlipids, 6))
+		frame_ranges = []
+		total_frames = self.nframes
+		frames_per_proc_base = total_frames/nprocs
+		left_over = total_frames % (frames_per_proc_base * nprocs)
+		print "total frames ",total_frames
+		print "frames per proc ",frames_per_proc_base
+		print "left over ",left_over
+		#assign base ranges
+		for i in xrange(nprocs):
+			fs = i*frames_per_proc_base
+			fe = fs + frames_per_proc_base - 1
+			frame_ranges.append([fs,fe])
+		print "frame_ranges (pre-adjust):"	
+		print frame_ranges
+		#now adjust for leftovers - divide them "equally" over the processes
+		lo = left_over
+		while lo > 0:
+			for i in xrange(nprocs):
+				frame_ranges[i][1]+=1
+				for j in xrange(i+1,nprocs):
+					frame_ranges[j][0]+=1
+					frame_ranges[j][1]+=1
+				lo-=1
+				if lo == 0:
+					break
+		
+		print "nprocs ",nprocs
+		print "frame_ranges (post adjust): "
+		print frame_ranges
+		
+		thick_frames = Thickness_frames
+		frames_local = par_frames(self.frame.nframes,self.frame.fs_name,self.frame.frame_shelf)
+		plane_local = self.plane
+		norm_local = self.norm
+		#create process pool
+		pool = mp.Pool(processes=nprocs)
+		results = [pool.apply_async(thick_frames,args=(frames_local,frame_ranges[i][0],frame_ranges[i][1],self.leaflets,nlip,plane_local,norm_local)) for i in range(0,nprocs)]
+		print "results:"
+	#	print results
+		print "len(results) ",len(results)
+		results_ordered = [p.get() for p in results]
+		print "results ordered: "
+	#	print results_ordered
+#		#collect results  into single array for return
+		i = 0
+		#print "len(results_ordered) ",len(results_ordered)
+		for p in results_ordered:
+			fs = frame_ranges[i][0]
+			fe = frame_ranges[i][1]
+			print fs, fe
+			#print msd[fs:(fe+1)].shape
+			#print p[:].shape
+			zdistf = p[0]
+			zmapf = p[1]
+			#print zdistf.shape," ",zmapf.shape
+			zdists[fs:(fe+1)] = zdistf[:]
+			zmaps[fs:(fe+1)] = zmapf[:]
+			#zdists[fs:(fe+1)] = pg[:]
+			i+=1
+		pool.close()
+		pool.join()
+		#initialize a numpy array to hold the msd for the selection		
+		zdist_tavg = zdists
+		if timeaverage:
+			#regenerate the container
+			zdist_tavg = np.zeros((self.nframes, 5))
+			# get the running time average
+			tavg_dz = GenRunningAverage(zdists[:,1])
+			#slice together the values
+			zdist_tavg[:,0:3]=zdists[:,:]
+			zdist_tavg[:,3:5]=tavg_dz[:,:]
+			
+			
+		#shelf_local.close()
+		return zdsit_tavg,zmaps
+		#return zdist_tavg
+
 
