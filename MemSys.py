@@ -27,6 +27,12 @@ def GenRunningAverage(onednparray):
 		output[i,1]=run_dev
 	return output
 
+def ColorizeStepVectorClusters(vectors):
+	
+	return "nothing yet!"
+	
+	
+
 #lipid center of mass object - stores the center of mass of a lipid/residue - stores both wrapped and unwrapped coordinates
 class LipidCOM:
 
@@ -1302,8 +1308,8 @@ class MemSys:
 		return out_tess
 
 
-	# generate the step vectors of the center of mass
-	def StepVector(self, leaflet="both",group="all",fstart=0,fend=-1,fstep=1000):
+	# generate the step vectors of the center of mass--in the lateral dimensions
+	def StepVector(self, leaflet="both",group="all",fstart=0,fend=-1,fstep=1000,wrapped=False):
 		indices = []
 		if fstart<0:
 			fstart+=self.nframes
@@ -1351,8 +1357,13 @@ class MemSys:
 			for i in indices:
 				com_i = curr_frame.lipidcom[i].com_unwrap[self.plane]
 				com_j = prev_frame.lipidcom[i].com_unwrap[self.plane]
-				vec_ends[count,0]=com_j[0]
-				vec_ends[count,1]=com_j[1]
+				com_j_w = prev_frame.lipidcom[i].com[self.plane]
+				if wrapped: 
+					vec_ends[count,0]=com_j_w[0]
+					vec_ends[count,1]=com_j_w[1]
+				else:
+					vec_ends[count,0]=com_j[0]
+					vec_ends[count,1]=com_j[1]
 				vec_ends[count,2]=com_i[0] - com_j[0]
 				vec_ends[count,3]=com_i[1] - com_j[1]
 			#	vec_ends.append([com_j[0],com_j[0],com_i[0]-com_j[0],com_i[1]-com_j[1]])
