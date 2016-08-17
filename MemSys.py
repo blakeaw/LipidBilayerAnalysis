@@ -28,6 +28,10 @@ def GenRunningAverage(onednparray):
 	return output
 
 def ColorizeStepVectorClusters(vectors):
+	nvecs = len(vectors)
+	np.zeros(nvecs,dtype=np.int)
+	colors_out = np.zeros(nvecs)
+	
 	
 	return "nothing yet!"
 	
@@ -60,6 +64,7 @@ class Frame:
 		self.lipidcom = []
 		self.box = np.zeros(3)
 		self.time = np.zeros(1)
+		self.number = np.zeros(1,dtype=np.int)
 		for i in xrange(nlipids):
 			self.lipidcom.append(LipidCOM())
 		return
@@ -542,7 +547,7 @@ class MemSys:
 			# set the box dimensions and the time for this frame
 			cframe.SetBox(frame.dimensions[0:3])
 			cframe.SetTime(frame.time)
-			
+			cframe.number = f
 			# loop over the residues (lipids) and get the centers of mass
 			r=0			
 			for res in mem_sel.residues:
