@@ -71,7 +71,7 @@ def build_acyl_index_lists(membrane_lipid_sel):
 					acyl_hydrogens.append(hbond)
 	return acyl_carbons,acyl_hydrogens
 #average over all acyl groups of all the lipids based on description in Moore et al. 2001 Biophysical Journal 81(5) 2484-2494
-def average_deuterium_order_preston(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
+def average_deuterium_order_Moore(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
 
 	bilayer_norm = np.array([0.0,0.0,1.0])
 	if	norm_axis is 'x':
@@ -127,7 +127,7 @@ def average_deuterium_order_preston(trajectory,membrane_sel, fstart=0,fend=-1,fs
 	return Scd_out
 
 #average over all acyl groups of all the lipids based on description in Vermeer Eur Biophys J (2007) 36:919-931
-def average_deuterium_order_louic(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
+def average_deuterium_order_Vermeer(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
 
 	bilayer_norm = np.array([0.0,0.0,1.0])
 	if	norm_axis is 'x':
