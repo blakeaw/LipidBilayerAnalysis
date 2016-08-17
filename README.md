@@ -1,4 +1,4 @@
-# MembraneAnalysis
+# LipidBilayerAnalysis
 
 Mean Squared displacement functions:
   pMSD.py - a set of functions to compute the MSD of MD Analysis selections and lists of selections
