@@ -70,8 +70,8 @@ def build_acyl_index_lists(membrane_lipid_sel):
 					acyl_carbons.append(ai)
 					acyl_hydrogens.append(hbond)
 	return acyl_carbons,acyl_hydrogens
-
-def average_deuterium_order(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
+#average over all acyl groups of all the lipids based on description in Moore et al. 2001 Biophysical Journal 81(5) 2484-2494
+def average_deuterium_order_preston(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
 
 	bilayer_norm = np.array([0.0,0.0,1.0])
 	if	norm_axis is 'x':
@@ -126,4 +126,60 @@ def average_deuterium_order(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, n
 		f+=1
 	return Scd_out
 
-		
+#average over all acyl groups of all the lipids based on description in Vermeer Eur Biophys J (2007) 36:919-931
+def average_deuterium_order_louic(trajectory,membrane_sel, fstart=0,fend=-1,fstep=1, norm_axis='z'):
+
+	bilayer_norm = np.array([0.0,0.0,1.0])
+	if	norm_axis is 'x':
+		bilayer_norm = np.array([1.0,0.0,0.0])
+	elif norm_axis is 'y':
+		bilayer_norm = np.array([0.0,1.0,0.0])
+	nframes = len(trajectory)
+	
+	#adjust the frame end points for slicing
+	if fend != -1:
+		fend+=1
+	if fend == (nframes-1) and fstart == (nframes-1):
+		fend+=1
+	if fend == fstart:
+		fend+=1
+	if fstart<0:
+		fstart+=nframes
+	if fend < 0:
+		fend+=nframes+1
+	
+	nframes = (fend - fstart)/fstep
+	print "doing frame slice points ",fstart," to ",fend, " with step ",fstep
+	print "total of ",nframes," frames"
+	#build the index lists of acyl components
+	print "building index lists for acyl groups"
+	acyl_carbons,acyl_hydrogens = build_acyl_index_lists(membrane_sel)
+	n_acyl = len(acyl_carbons)
+	print "there are ",n_acyl," acyl groups"
+	#configuration and time average for Scd = < 0.5 ( 3 cos**2(beta) - 1) >
+	Scd = RunningStats()
+	Scd_out = np.zeros((nframes,3))
+	f=0
+	for frame in trajectory[fstart:fend:fstep]:
+		curr_time = frame.time
+		for i in xrange(n_acyl):
+			
+			c_i = acyl_carbons[i]
+			h1_i = acyl_hydrogens[i][0]
+			h2_i = acyl_hydrogens[i][1]
+			c_pos = frame._pos[c_i]
+			h1_pos = frame._pos[h1_i]
+			h2_pos = frame._pos[h2_i]
+			v_ch1 = h1_pos - c_pos
+			v_ch2 = h2_pos - c_pos
+			cos_beta_ch1 = cos_angle_between_vectors(v_ch1,bilayer_norm)
+			cos_beta_ch2 = cos_angle_between_vectors(v_ch2,bilayer_norm)
+			scd_ch1 = 0.50*(3.0* cos_beta_ch1**2 -1.0)
+			scd_ch2 = 0.50*(3.0* cos_beta_ch1**2 -1.0)
+			Scd.Push(scd_ch1)
+			Scd.Push(scd_ch2)
+		Scd_out[f,0]=curr_time
+		Scd_out[f,1]=Scd.Mean()
+		Scd_out[f,2]=Scd.Deviation()
+		f+=1
+	return Scd_out	
