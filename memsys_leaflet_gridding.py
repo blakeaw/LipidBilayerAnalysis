@@ -170,11 +170,138 @@ class LeafletGrids:
 		else:
 			return avg_out
 
-#	def MapToGrid(self,com_values,leaflet='both'):
-#		
-#		return
+	def MapToGrid(self,com_values_dict,leaflet='both'):
+		do_leaflet = []
+		if leaflet == "both":
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+		elif leaflet == "upper" or leaflet == "lower":
+			do_leaflet.append(leaflet)
+		else:
+			#unknown option--use default "both"
+			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the LeafletGrids of frame ",self.myframe
+			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
 		
-	def WriteXYZ(self,leaflet='both',zvalue='Default',out_path="./"):
+		out_dict = {}		
+		for leaf in do_leaflet:
+			out_dict[leaf] = np.zeros((self.nbins_x,self.nbins_y))
+			for ix in xrange(self.nbins_x):
+				for iy in xrange(self.nbins_y):
+					com_ind=self.leaflets[leaf].GetIndexAt(ix,iy)
+					value = com_values_dict[com_ind]
+					out_dict[leaf][ix,iy]=value
+					
+		return out_dict
+	
+	def AreaPerLipid(self):
+		do_leaflet = []
+		do_leaflet.append('upper')
+		do_leaflet.append('lower')
+		#get the unique type/resnames in the system
+		resnames = []
+		for leaf in do_leaflet:
+			for group in self.com_leaflets[leaf].groups:
+				gname = group.name()
+				if gname not in resnames:
+					resnames.append(gname)
+		#initialize counters for each residue/type
+		area_run_per_res_type = {}
+		
+		for name in resnames:
+			area_run_per_res_type[name]=RunningStats()
+			
+		area_per_lipid = {}
+		
+		area_run = RunningStats()
+		for leaf in do_leaflet:
+			area_per_bin = self.leaflets[leaf].x_incr*self.leaflets[leaf].y_incr
+			lip_ind = self.com_leaflets[leaf].GetMemberIndices()
+			for i in lip_ind:
+				rname = self.frame.lipidcom[i].type
+				locations = np.where(self.leaflets[leaf].lipid_grid == i)
+				nlocs = len(locations[0])
+				#print locations
+				#print 'nlocs ',nlocs
+				area = area_per_bin*nlocs
+				area_per_lipid[i]=area
+				area_run_per_res_type[rname].Push(area)
+				
+				area_run.Push(area)
+		
+		average_per_res = {}
+		for name in resnames:
+			average = area_run_per_res_type[name].Mean()	
+			std = area_run_per_res_type[name].Deviation()
+			average_per_res[name] = (average,std)		
+		system_average = area_run.Mean()
+		system_dev = area_run.Deviation()			
+		
+		output = ((system_average,system_dev),average_per_res,area_per_lipid)		
+		return output
+#	def Curvature(self):
+		
+
+	def GridToDict(self,in_grid,leaflet='upper'):
+		out_dict = {}
+		for ix in xrange(self.nbins_x):
+			for iy in xrange(self.nbins_y):
+				l_i = self.leaflets[leaflet].GetIndexAt(ix,iy) 
+				grid_val = in_grid[ix,iy]
+				out_dict[l_i]=grid_val		 
+		return out_dict
+
+	def GetXYZ(self,leaflet='both',zvalue_dict='Default',color_dict=None):
+		do_leaflet = []
+		if leaflet == "both":
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+		elif leaflet == "upper" or leaflet == "lower":
+			do_leaflet.append(leaflet)
+		else:
+			#unknown option--use default "both"
+			print "!! Warning - request for unknown leaflet name \'",leaflet,"\' from the LeafletGrids of frame ",self.myframe
+			print "!! the options are \"upper\", \"lower\", or \"both\"--using the default \"both\""
+			do_leaflet.append('upper')
+			do_leaflet.append('lower')
+		out_dict = {}
+		npoints = (self.nbins_x*self.nbins_y)
+		X = np.zeros(npoints)
+		Y = np.zeros(npoints)
+		Z = np.zeros(npoints)
+		C = np.zeros(npoints)
+		for leaf in do_leaflet:
+			npt = 0
+			cx=0
+			for x in self.leaflets[leaf].x_centers:
+				cy=0
+				for y in self.leaflets[leaf].y_centers:
+					#get the z coordinate
+					z = self.leaflets[leaf].GetZAt(cx,cy)
+					ic = self.leaflets[leaf].GetIndexAt(cx,cy)
+					#optionally pull z value from lipid index dictionary
+					if zvalue_dict is not 'Default':
+						z = zvalue_dict[ic] 
+					X[npt]=x
+					Y[npt]=y
+					Z[npt]=z
+					if color_dict is not None:
+						C[npt]=color_dict[ic]
+					npt+=1
+					cy+=1
+				cx+=1	
+			if color_dict is not None:
+				col_min = min(C)
+				C-=col_min
+				col_max = max(C)
+				C/=col_max
+				out_dict[leaf]=(X,Y,Z,C)
+			else:	
+				out_dict[leaf]=(X,Y,Z)
+		return	out_dict
+	
+	def WriteXYZ(self,leaflet='both',zvalue_dict='Default',out_path="./"):
 		do_leaflet = []
 		if leaflet == "both":
 			do_leaflet.append('upper')
@@ -193,7 +320,7 @@ class LeafletGrids:
 		out_name+=".xyz"	
 		# Open up the file to write to
 		xyz_out = open(out_name, "w")
-		npoints = (self.x_nbins*self.y_nbins)*len(do_leaflet)
+		npoints = (self.nbins_x*self.nbins_y)*len(do_leaflet)
 		comment = "Leaflet Grid in xyz coordinate format"
 		xyz_out.write(str(npoints))
 		xyz_out.write("\n")
@@ -209,8 +336,8 @@ class LeafletGrids:
 					z = self.leaflets[leaf].GetZAt(cx,cy)
 					ic = self.leaflets[leaf].GetIndexAt(cx,cy)
 					#optionally pull z value from lipid index dictionary
-					if zvalue is not 'Default':
-						z = zvalue[ic] 
+					if zvalue_dict is not 'Default':
+						z = zvalue_dict[ic] 
 					#get the lipid resname
 					
 					oname = self.frame.lipidcom[ic].type
