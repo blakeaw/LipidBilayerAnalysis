@@ -1,17 +1,17 @@
-"""
-This MemSys module defines various classes and functions used to process and analyze a lipid 
+"""Center of Mass based bilayer analysis tools
+
+This module defines various classes and functions used to process and analyze a lipid 
 bilayer trajectory. This module assumes the structure and trajectory are initiallaly stored in MDAnalysis
 objects and therefore processes MDAnalysis objects. The lipids constituting the bilayer are read in from
 the MDAnalysis objects and are converted to center of mass (COM) representations. Lipids are partitioned
 into an 'upper' and a 'lower' leaflet based on the z-position of the COM. The built-in analysis functions
 then operate on the COM representations to compute quantities such as the lateral mean squared displacement.  
-Many analysis functions allow specification of the leaflet and type of lipid to perform the its analysis on.
+Many analysis functions allow specification of the leaflet and type of lipid to perform the the analysis on.
 The primary (parent class) is the MemSys class. The analysis functions are members of the MemSys class.
 
-Example initialization:
-    import MemSys as ms
-    mem_sys = ms.MemSys(mda_universe.trajectory,mda_selection_of_bilayer_lipids)
- 
+Example:
+    >> import MemSys as ms
+    >> mem_sys = ms.MemSys(mda_universe.trajectory,mda_selection_of_bilayer_lipids)
 """
 
 #imports
@@ -34,20 +34,16 @@ from pUnwrap import mda_wrap_coordinates,mda_wrap_coordinates_parallel
 # assumes that a 1d numpy array of floats is pass as input, but 
 # does not check this
 def GenRunningAverage(onednparray):
-    """    
-        Genates a running average array corresponding to  
-        the data in a 1d numpy array.
-
-        Parameters
-        ----------
-        onednparray : a 1d numpy array, assumed to be array of floats     
-        
-        Returns
-        -------
-        2d numpy array of dim len(onednparray)x2
-            2dnparray[i][0] = running mean at i
-            2dnparray[i][1] = running standard deviation at i    
-                {i = 0; i < len(onednparray)}
+    """ Generates a running average 
+                 
+    Args:
+    onednparray (numpy.array): A 1d numpy array of measurements (e.g. over time)     
+    
+    Returns:
+    numpy.array: 2d array of dim len(onednparray)x2
+        2dnparray[i][0] = running average at i
+        2dnparray[i][1] = running standard deviation at i    
+        for i in range(0,len(onednparray))
     """
     averager = RunningStats()
     nele = len(onednparray)
@@ -69,26 +65,21 @@ def ColorizeStepVectorClusters(vectors):
     
     
 class LipidCOM:
-    """    
-        A lipid center of mass (COM) object. This object stores the COM coordinats
-        of a lipid (or other molecule or group of atoms) computed from both the wrapped
-        and unwrapped atomic coordinates. This object also stores information about the
-        type of lipid as well as the total mass of the lipid.  
-                
+    """ A lipid center of mass (COM) object.  
+
+    This object stores the COM coordinates of a lipid (or other molecule or group
+    of atoms) computed from both the wrapped and unwrapped atomic coordinates. This
+    object also stores information about the type of lipid as well as the total mass
+    of the lipid.            
     """
     def __init__(self):
-         """    
-            This is the initialization function of the center of the LipidCOM object. 
-            This function initializes all the LipidCOM instance attributes and assigns 
-            some default values.
-
-            Parameters
-            ----------
-            void
-                           
-            Returns
-            -------
-            void
+        """LipidCOM initialization 
+ 
+        Attributes:
+            type (str): The lipid type (e.g. the lipid could be typed b resname).
+            com (np.array): The length three vector holding the wrapped xyz coordinates.
+            com_unwrap (np.array): The length three vector holding the unwrapped xyz coordinates.
+            mass (float): The total mass of the atoms used to define LipidCOM. 
         """
         # lipid type/resname or other name    
         self.type="UNK"
@@ -102,23 +93,19 @@ class LipidCOM:
     # The name of this function could be changed to be more desriptive, e.g. 
     # extract_com_mda_residue  
     def extract(self, mda_residue, unwrap=False):
-        """    
-            This function "extracts" the center of mass (COM) of an MDAnalysis residue. 
-            This function calls the MDAnalysis member function center_of_mass() of the residue
-            to compute the center of mass of the atoms constituting the residue.
+        """ Get the center of mass coordinates from an MDAnalysis residue  
 
-            Parameters
-            ----------
-            mda_residue : an MDAnalysis residue object
-            unwrap : bool, Optional
-                      False (default) - The COM coordinates are stored in the 
-                      container designated for the unwrapped coordinate representation.
-                      True - The COM coordinates are stored in the container designated
-                      for the wrapped coordinate representation
-                           
-            Returns
-            -------
-            void
+        This function calls the MDAnalysis member function center_of_mass() of the residue
+        to compute the center of mass of the atoms constituting the residue.
+
+        Args:
+            mda_residue (MDAnalysis.residue): An MDAnalysis residue object from which to extract
+                a center of masss coordinates.
+            unwrap (bool, optional): Define which com container to store coordiates in.
+                False (default) - The COM coordinates are stored in the 
+                container designated for the unwrapped coordinate representation.
+                True - The COM coordinates are stored in the container designated
+                for the wrapped coordinate representation.
         """
         if unwrap:
             self.com_unwrap = mda_residue.center_of_mass()
@@ -131,30 +118,27 @@ class LipidCOM:
 
 # a frame object 
 class Frame:
-    """    
-        A molecular dynamics Frame object. This object stores all the LipidCOM objects
-        corresponding to a specific timestep, as well as other information about that
-        timestep inluding the rectangular box dimensions, simulation time.  
+    """ A molecular dynamics style Frame object. """    
                 
-    """
     # does not check that nlipids is an int
     def __init__(self, nlipids):
-        """    
-            This is the initialization function of Frame object. 
-            This function initializes all the Frame instance attributes and assigns 
-            some default values.
+        """ Frame initialization.    
 
-            Parameters
-            ----------
-            nlipids : int, The number of lipids (LipidCOM objects) that this frame contains
-                           
-            Returns
-            -------
-            void
+        Args:
+            nlipids (int): The number of lipids (LipidCOM objects) that this frame will hold
+
+        Atrributes:
+            lipidcom (list of obj:LipidCOM): A list of the LipidCOM objects assigned to the Frame.
+            box (np.array): A 3 element vector containing the (rectangular) xyz box edge lengths. 
+            time (float): The simulation time that this Frame represents.
+            number (int): The frame number (or timestep) of this Frame.
+            
         """
         # list to store the nlipids LipidCOM objects
         self.lipidcom = []
-        # box dimensions
+        # box dimensions -- assumes the box originates a 0,0,0
+        # It might be worth adding functionality to specifiy the box origin (or center)
+        # This also assumes a rectangular box
         self.box = np.zeros(3)
         # simulation time
         self.time = np.zeros(1)
@@ -167,37 +151,32 @@ class Frame:
         return
     
     def SetBox(self, box_lengths):
-        """    
-            This member function is used to set the box dimensions of a Frame.
+        """ Set the rectangular xyz box edge lengths.    
 
-            Parameters
-            ----------
-            box_lengths : numpy array - 1d, 3 element numpy array containing the x,y,z box sizes 
-                           
-            Returns
-            -------
-            void
+        Args:
+            box_lengths (numpy.array): A 1d, 3 element numpy.array containing the x,y,z box sizes (or edge lengths) 
+
         """
         self.box = box_lengths
         return
 
     def SetTime(self, time):
-        """    
-            This member function is used to set the simulation time of a Frame.
+        """ Set the simulation time.    
 
-            Parameters
-            ----------
-            time : float, simulation time 
-                           
-            Returns
-            -------
-            void
+        Args: 
+            time (float): The simulation time to assign to this Frame.
+
         """
         self.time = time
         return
 
     def __len__(self):
-            return len(self.lipidcom)
+        """ Returns the number of LipidCOM objects assigned to this Frame
+        
+        Returns:
+            int: Number of LipidCOM objects currently assigned to this Frame
+        """
+        return len(self.lipidcom)
 
 #    def COG(self,unwrapped=False):
 #        cog_out = np.zeros(3)
@@ -210,22 +189,20 @@ class Frame:
 #        return com_out
     
     def COM(self, wrapped=True):
-        """    
-            This member function is used to compute the overall center of mass (COM) of a Frame.
-            This function uses the LipidCOM object coordinates and masses to compute the COM of
-            the frame. 
+        """ Computes the center of mass (COM) for the Frame    
+        
+        This member function is used to compute the overall center of mass (COM) of the 
+        Frame using the LipidCOM object coordinates and masses. 
 
-            Parameters
-            ----------
-            unwrap : bool, Optional
-                      True (default) - The wrapped LipidCOM coordinates are used to compute 
-                       the COM of the frame
-                      False - The unwrapped LipidCOM coordinates are used to compute 
-                       the COM of the frame
-                           
-            Returns
-            -------
-            frame_com : float, center of mass of the Frame
+        Args: 
+            wrapped (bool, optional): Define which set of coordinates to use in the computation.
+                True (default) - The wrapped LipidCOM coordinates are used to compute 
+                the COM of the frame.
+                False - The unwrapped LipidCOM coordinates are used to compute 
+                the COM of the frame.
+                       
+        Returns:  
+            np.array: A 3 element vector containing the xyz coordinates of the Frame's COM
         """
         com_out = np.zeros(3)
         total_mass = 0.0
@@ -241,38 +218,37 @@ class Frame:
 
 #frame wrapper - the name of this class may be changed. e.g. FrameShelve
 class frames:
-    """    
-        This is a wrapper class for the Frame object that stores a set of Frame objects
-        corresponding to a molecular dynamics trajectory. This class saves the Frame objects
-        on disk using the shelve module and provides an interface to access instances of
-        those Frames. This class defines an append function and some built-ins to allow integer indexing
-        of the frames object (like an array) to add/get instances of Frame objects corresponding to that index.  
-                
+    """Container for Frame objects    
+    This class object serves as a container to stores a set of Frame objects
+    corresponding to a molecular dynamics trajectory. This class saves the Frame objects
+    on disk using the shelve module and provides an interface to access instances of
+    those saved Frames. The Frames are saved in the shelve database with integer index keys
+    0 -> (nframes-1). 
+                    
     """
-    _type_error ="instance of object MemSys.frames only excepts instances of MemSys.Frame"
+    #define a non-instance type error message
+    _type_error ="Instance of object MemSys.frames only excepts instances of MemSys.Frame."
     
     def __init__(self,prefix='/tmp/',save=False):
-        """    
-            This is the initialization function of the frames object. 
-            This function initializes all the frame instance attributes and assigns 
-            some default values.
+        r""" Initialization of the frames object.  
 
-            Parameters
-            ----------
-            prefix : string, Optional; The location to store the "shelve"d Frame data.   
-                     '/tmp/' (default) - The data is stored in the unix/linux tmp directory.
-            save : bool, Optional; determine whether to delete the shelved Frame data after object deletion 
-                   False (default) - the shelved Frame data is deleted upon calling __del__ 
-                   True  - the shelved Frame data is not deleted when __del__ is called 
-                           
-            Returns
-            -------
-            void
+        Args:
+            prefix (str, optional): The location/path to store the "shelve"d Frame data.   
+                '/tmp/' (default) - The data is stored in the unix/linux tmp directory.
+            save (bool, optional): Set whether to save the shelved Frame data after frames object deletion. 
+                False (default) - the shelved Frame data is deleted upon calling __del__ 
+                True  - the shelved Frame data is not deleted when __del__ is called 
+        
+        Attributes:
+            nframes (int): The number Frame objects being stored.
+            pid (int): The process id that the frames object is created in.
+            path (str): The path to where the shelved Frame data is stored.
+            save (bool): Set whether to save the shelved Frame data after frames object deletion. 
+            fs_name (str): The base name of the shelve database file used to store Frame objects.
+            frame_shelf (shelve.Shelf): The Shelf that will hold the Frame objects.
         """
         self.nframes = 0
         self.pid = os.getpid()
-        if prefix == 'Default':
-            prefix = '/tmp/'
         
         if    prefix[-1] != '/':
             prefix = prefix +'/'
@@ -291,18 +267,10 @@ class frames:
         return
 
     def __del__(self):
-        """    
-            Non-standard implementation for the __del__ built-in.
-            Closes the Frame shelve database file and deletes the shelved Frame
-            data if the frames.save parameter is False
-
-            Parameters
-            ----------
-            void
-                           
-            Returns
-            -------
-            void
+        """ Non-standard implementation for the __del__ built-in for frames.  
+        
+        Closes the Frame shelve database file and deletes the shelved Frame
+        data if the frames.save parameter is False
         """
         self.frame_shelf.close()
         if not self.save:
@@ -311,63 +279,57 @@ class frames:
         return
 
     def append(self,item):
-        """    
-            This member function allows tail append/addition like fucntionality for a Frame object. The new Frame
-            is added to the shelve database with a key n_frames and the number of Frames is incremented by 1.
+        """ Append a Frame.
+    
+        The new Frame is added to the shelve database with a key 'self.nframes', 
+        which is then incremented (self.nframe+=1).
 
-            Parameters
-            ----------
-            item : The instance of a Frame object to be appended
+        Args:                
+            item (obj:Frame): The instance of a Frame object to be appended.
                            
-            Returns
-            -------
-            void, TypeError:  Returns a TypeError if item passed for appending is not a Frame instance.
+        Raises:        
+            TypeError: If item is not an instance of Frame.
         """
         if isinstance(item, Frame):
             self.frame_shelf[str(self.nframes)] = item
             self.nframes+=1
-            return
         else:
-            return TypeError(self._type_error)
-    
+            raise TypeError(self._type_error)
+        return
 
     def __getitem__(self,key):
-        """    
-            Non-standard implementation for the __getitem__ built-in to allow integer
-            indexing of the frames object. This allows acces to the Frame objects by an 
-            integer indexing key, which are stored in the shelve database files.
+        """ Get a copy of Frame from the database at key    
 
-            Parameters
-            ----------
-            key : int - The index of the Frame object being called
-                           
-            Returns
-            -------
-            Frame_obj : This is an instance of the Frame object stored at index key (pulled from the shelve database)
+        The frames object is indexed with an integer key.
+
+        Args:
+            key (int): The index of the Frame object being called.
+                       
+        Returns:
+            
+        obj:Frame : This is an instance of the Frame object stored at index key (pulled from the Shelf database).
         """
-        if key < 0:
+        while key < 0:
             key += self.nframes
-        elif key > self.nframes:
+        while key > self.nframes:
             key = self.nframes-1
         
         return self.frame_shelf[str(key)]
 
     def __setitem__(self,key,item):
-        """    
-            Non-standard implementation for the __setitem__ built-in to allow integer
-            indexing of the frames object. This allows the Frame stored at the index key to set. 
+        """ Set the Frame at key in the Shelf database   
 
-            Parameters
-            ----------
-            key : int - The index of where the input Frame should be stored.
-            item : Frame object - This is an instance of a Frame object to be stored at index key.               
-            Returns
-            -------
-            void, TypeError : This function returns a TypeError if the input item is not an instance of a Frame object
+        Args:   
+            key (int): The index where the input Frame should be stored.
+            item (obj:Frame): This is an instance of a Frame object to be stored at index key.               
+            
+        Raises:
+            TypeError : If the input item is not an instance of the Frame object
             
         """
         if not isinstance(item, Frame):
-            return TypeError(self._type_error)
+            raise TypeError(self._type_error)
+            return
         if key < 0:
             key+=self.nframes
         elif key >= self.nframes:
@@ -377,18 +339,19 @@ class frames:
         return 
 
     def __len__(self):
+        """ Returns the number of Frame objects being stored.
+        
+        Returns:
+            int: The number of Frame objects this instance of frames.
+        """
         return self.nframes
 
     def __iadd__(self,item):
-        """    
-            Non-standard implementation for the __iadd__ built-in which allows a Frame object
-            to be appended using the '+=' operator. 
-
-            Parameters
-            ----------
-            item : Frame object - This is an instance of a Frame object to be appended.               
-            Returns
-            -------
+        """ Use += operator to append Frame objects
+        Appends by calling the append() function.    
+        Args:
+            item (obj:Frame): An instance of Frame to be appended.               
+                
         """
         self.append(item)
         return self
@@ -399,26 +362,23 @@ class frames:
 # I'm not sure why, but it is marked as ignored and it doesn't seem to cause any problems with the Frame shelve
 # database file.
 class par_frames:
-     """    
-        This class is effectively used to generate read-only copies of the frames class, which can be passed 
-        to functions that do parallelized computations over the number of frames.  
+     """ Read-Only version of frames object  
+     This class is effectively used to generate read-only copies of the frames class, which can be passed 
+     to functions that do parallelized computations over the number of frames.  Unlike frames par_frames 
+     does not create a new Shelf database. It must be passed an existing Shelf of Frame objects. par_frames
+     also does not have any functions defined to modify the Shelf (add/remove Frame objects). This is to
+     avoid conflicts from multiple processor accesses to the Shelf database.  
                 
     """
-    # fs_name does not actually get used, so it is deprecated and should probably be removed at some point.
+    # fs_name does not actually get used, so it should probably be removed.
     def __init__(self, nframes, fs_name, frame_shelve):
-         """    
-            This is the initialization function of the par_frames object. 
-            This functions stors a copy of an existing Frame shelve file object. 
-
-            Parameters
-            ----------
-            nframes : int - the number of Frames stored in the shelve database
-            fs_name : string - the name (prefix) of the shelve database file
-            frame_shelve : the shelve file object storing the Frames to be accessible by this object. 
-                           
-            Returns
-            -------
-            void
+        """ Initialize the par_frames object  
+  
+        Args:
+        nframes (int): The number of Frames stored in the shelve database.
+        fs_name (string): The base name (prefix) of the shelve database files.
+        frame_shelve (shelve.Shelf): The Shelf object containing the Frame objects. 
+       
         """
             self.nframes = nframes            
             self.fs_name = fs_name 
@@ -428,57 +388,58 @@ class par_frames:
             #self.frame_shelf = shelve.open(self.fs_name,flag="r", protocol=2)
             self.frame_shelf = frame_shelve
             return
-
-#    def __del__(self):
-#        self.frame_shelf.close()
-#        return
     
     def __getitem__(self,key):
-        """    
-            Non-standard implementation for the __getitem__ built-in to allow integer
-            indexing of the par_frames object. This allows acces to the Frame objects stored in the shelve database using 
-            an integer indexing key.
+        """ Get a copy of the Frame object stored at key.   
+        
+        Args:
+            key (int): The index of the Frame object being called.
+                       
+        Returns:
+            
+        obj:Frame : This is an instance of the Frame object stored at index key (pulled from the shelve database)
 
-            Parameters
-            ----------
-            key : int - The index of the Frame object being called
-                           
-            Returns
-            -------
-            Frame_obj : This is an instance of the Frame object stored at index key (pulled from the shelve database)
         """
-        if key < 0:
+        while key < 0:
             key += self.nframes
-        elif key > self.nframes:
+        while key > self.nframes:
             key = self.nframes-1
         
         return self.frame_shelf[str(key)]
 
     def __len__(self):
+        """ Returns the number of Frame objects being stored.
+        
+        Returns:
+            int: The number of Frame objects this instance of frames.
+        """
         return self.nframes
 
             
 # leaflet object    
 class Leaflet:
-    """    
-        This class object is used to group lipids together according to their bilayer leaflet. It is primarily meant to 
-        store the indices of LipidCOMs as they are in a Frame.lipidcom list. This class also 
-        creates sub-groups within the Leaflet based on the LipidCOM.type using LipidGroup objects.
+    """ Create a bilayer Leaflet representation.   
+    This class object is used to group lipids together according to their bilayer leaflet. It is primarily meant to 
+    store the indices of LipidCOMs as they are in a Frame.lipidcom list. This class also 
+    creates sub-groups within the Leaflet based on the LipidCOM.type using LipidGroup objects. Instances of Leaflet
+    are created by the MemSys class.
                 
     """
     def __init__(self, name):
-        """    
-            This is the initialization function of Leaflet object. 
-            This functions initializes the lists and dicts necessary to hold 
-            the Leaflet data.  
-
-            Parameters
-            ----------
-            name : string - the name of the bilayer leaflet being initialized ('upper' and 'lower' are used by the MemSys class)
-                           
-            Returns
-            -------
-            void
+        """Initializes an instance of a Leaflet object.    
+        
+        Args:
+            name (str): The name of the bilayer leaflet being initialized ('upper' and 'lower' are used by the MemSys class).
+        
+        Attributes:
+            name (str): The name of the Leaflet (e.g. 'upper' or 'lower').
+            members (list of int): A list containing the integer indices associated with the LipidCOM objects within
+                a Frame that are assigned to the Leaflet instance.
+            groups (list of obj:LipidGroup): A list of the LipidGroup objects (uniquely named) that are created by the Leaflet instance
+                as new members are added.
+            group_dict (dict): A dictionary keyed according to the names of the LipidGroup objects created, which stores the 
+                corresponding index of that LipidGroup in self.groups. 
+  
         """
         #the name of the leaflet - e.g. 'upper' or 'lower'
         self.name = name
@@ -497,27 +458,28 @@ class Leaflet:
         return '%s leaflet of a Membrane System with %s members and %s lipid groups' % (self.name, len(self.members), len(self.groups))
  
     def __len__(self):
+        """ Have len(Leaflet) return the number of lipids that have been added to the Leaflet instance.
+        
+        Returns:
+            int: Number of lipids in the Leaflet.
+        """
         return len(self.members)
 
     #consider changing var name of input 'resname' to something that doesn't conflict with LipidCOM.type  
     def AddMember(self, index, resname):
-        """    
-            This member function allows new lipids (by Frame.lipidcom index) to be added to the Leaflet. 
-
-            Parameters
-            ----------
-            index : The index of the lipid being added to the Leaflet
-            resname : the resname (or LipidCOM.type) of the lipid being added.
-                           
-            Returns
-            -------
-            void
+        """ Add new lipids to the Leaflet.
+           
+        This function is meant to be used to add new lipids according to their Frame.lipidcom index
+        to the Leaflet and to a LipidGroup according resname/type/name. 
+        Args:  
+            index (int): The index of the lipid being added to the Leaflet.
+            resname (str): The resname (or LipidCOM.type) of the lipid being added.
         """
         if len(self.members) == 0:
             self.members.append([index, resname])
             self.groups.append(LipidGroup(resname))
             self.groups[0].AddMember(index)
-            self.group_dict.update({resname:0})
+            self.group_dict.update({resname: 0})
         else:
             self.members.append([index, resname])
             addgroup = True
@@ -535,25 +497,21 @@ class Leaflet:
             else:
                 self.groups[group_ind].AddMember(index)
             
-            #self.members=sorted(self.members,key=lambda self.members:self.members[1])
-            
+            #self.members=sorted(self.members,key=lambda self.members:self.members[1])  
         return
 
     def GetGroupIndices(self, group_name):
-        """    
-            This member function returns the list of indices grouped in the LipidGroup object
-            with LipidGroup.lg_name matching the input name. This allows for selections of LipidCOMs of a specific type. 
+        """ Get the indices of lipids in the Leaflet belonging to a specific LipidGroup.   
 
-            Parameters
-            ----------
-            group_name : string - The name of the group (resname of the lipids) that indices are to returned. 
-                                  Passing the string 'all' will return indices of all the lipids assigned to
-                                  the Leaflet instance. If the group_name is not recognised (i.e. is not in the group_dict)
-                                  The function defaults to 'all'.
-                           
-            Returns
-            -------
-            void
+        Args:
+        group_name (string): The name of the LipidGroup pull LipidCOM indices from. 
+            Passing the string 'all' will return indices of all the lipids assigned to
+            the Leaflet instance. If the group_name is not recognised (i.e. is not in the group_dict)
+            The function defaults to 'all'.
+                       
+        Returns:
+            list of int: A list containing the integer indices of lipids in the Leaflet that
+                belong to the specified LipidGroup.
         """
         indices = []
         if group_name == "all":
@@ -574,16 +532,11 @@ class Leaflet:
         return list(indices)
 
     def GetMemberIndices(self):
-        """    
-            This member function returns the list of indices for the lipids grouped in the Leaflet instance.
-
-            Parameters
-            ----------
-            void
+        """ Get the indices of all lipids (LipidCOM) in the Leaflet.   
+        This member function Returns: the list of indices for the lipids grouped in the Leaflet instance.
                            
-            Returns
-            -------
-            indices : list - a list of integer indices of the lipids in the Leaflet instance
+        Returns:
+            list of int: A list of integer indices of the lipids associated with the Leaflet instance.
         """
         indices = []
         for element in self.members:
@@ -592,72 +545,48 @@ class Leaflet:
         return list(indices)
 
     def HasGroup(self, group_name):
-        """    
-            This member function provides a way to check if there is LipidGroup in the Leaflet instance with the input
-            name.
-
-            Parameters
-            ----------
-            group_name : string - The name to checked against existing LipidGroup names
+        """ Check if there is a LipidGroup with the specified name.  
+            
+        Args:
+            group_name (str): The name to checked against the names of existing LipidGroup objects.
                            
-            Returns
-            -------
-            answer : bool - True if there is a LipidGroup with name group_name, False otherwise
+        Returns:
+            bool: True if there is a LipidGroup with name group_name, and False otherwise.
         """
-        return [group_name in self.group_dict]
+        return group_name in self.group_dict.keys()
 
     def NumGroups(self):
-        """    
-            This member function returns the number of unique LipidGroups that have initialized within
-            an instance Leaflet
-
-            Parameters
-            ----------
-            none
-                           
-            Returns
-            -------
-            number_of_groups : int - The number of unique LipidGroups
+        """ Get the number of LipidGroups in the Leaflet.   
+    
+        Returns:
+        int: The number of unique LipidGroups.
         """
         return len(self.groups)
 
     def GetGroupNames(self):
-         """    
-            This member function returns the list of LipidGroup names that current exist in the 
-            the Leaflet instance
-
-            Parameters
-            ----------
-            void
-                           
-            Returns
-            -------
-            names : list - a list of string LipidGroup names
+         """ Get the names of all the LipidGroup objects in the Leaflet  
+ 
+         Returns:
+         list of str: A list of the names of current LipidGroup objects.
         """
         return [group.lg_name for group in self.groups]
 
         
 class LipidGroup:
-    """    
-        This class object is used to group lipids together according to their type/resname/name. It is primarily meant to 
-        store the indices of the LipidCOMs as they are in a Frame.lipidcom list. 
-        Lipid members are added dynamically using the AddMember function. 
-                
+    """ Object to group lipid indices by type/resname/name.   
+        Instances of this object are created by the Leaflet class.
+                       
     """
     def __init__(self, name):
-        """    
-            This is the initialization function of LipidGroup object. 
-            This functions initializes the list to store its members indices.
-            This function also sets the name of the LipidGroup object instance. 
-           
+        """ Initializes LipidGroup object.               
 
-            Parameters
-            ----------
-            name : string - the name/type/resname of the lipids being grouped in this object 
-                           
-            Returns
-            -------
-            void
+        Args:
+            name (str): The name/type/resname of the lipids being grouped in this object. 
+        
+        Attributes:
+            lg_members (list of int): A list to hold the indices of lipids added to this 
+                this LipidGroup.
+            lg_name (str): The name/type/resname of the lipids being grouped in this object.
         """
         #initialize a list to hold the member indices
         self.lg_members = []
@@ -666,61 +595,48 @@ class LipidGroup:
         return
 
     def AddMember(self, new_mem):
-         """    
-            This member function allows dynamic addition (via appending to the member list) of 
-            lipids via their index to the current LipidGroup instance. 
-
-            Parameters
-            ----------
-            new_mem : int - the index of the lipid being added to this lipid group 
-                           
-            Returns
-            -------
-            void
+         """ Add lipid index to to the LipidGroup.
+   
+         Args:
+            new_mem (int): The index of the lipid being added to this LipidGroup. 
         """
         self.lg_members.append(new_mem)
         return
 
     def name(self):
-        """    
-            This a member function to return the name of the current LipidGroup instance. 
+        """ Get the name associated with this LipidGroup.   
 
-            Parameters
-            ----------
-            void
-                           
-            Returns
-            -------
-            name : string - the name of the lipid group (i.e. lg_name) 
+        Returns:               
+            str: The name of the lipid group (i.e. lg_name) 
         """
         return self.lg_name
 
 def MSD_frames(frames, fstart, fend, indices, refframe, plane):
-     """
-        This function allows the mean squared displacement (MSD) to be computed
-        for a specified subset of the Frames in a frames (or par_frames) object.     
-        This function was created to be called from the function MemSys.CalcMSD_parallel
-        as a function to be passed to the multiprocessor threads.   
+    """ Compute the mean squared displacement for range of Frame objects in frames.
+
+    This function allows the mean squared displacement (MSD) to be computed
+    for a specified subset of the Frame objects in a frames (or par_frames) object.     
+    This function was created to be called from the function MemSys.CalcMSD_parallel
+    as a function to be passed to the multiprocessor threads.   
         
-        Parameters
-        ----------
-        frames : frames or par_frames object  - object containing all the Frames of the trajectory
-        fstart : int - the first frame to start the analysis on
-        fend : int - the last frame to analyze
-        indices : list - list of integer indices of the LipidCOMs to include in the computation
-        refframe : int - the index of the frame that is to be taken as the reference for the MSD computation
-        plane : list - list of the indices corresponding to the coordinate planes (x: 0,y 1,z :2) to be included in the MSD   
+    Args:           
+        frames (obj:frames or obj:par_frames): The object containing all the Frames of the trajectory.
+        fstart (int): The index of the first frame to start the analysis on.
+        fend (int): The index of the last frame to analyze.
+        indices (list of int): List of integer indices of the LipidCOMs to include in the computation.
+        refframe (int): The index of the frame that is to be taken as the reference for the MSD computation.
+        plane (list of int): The list of the indices corresponding to the coordinate planes (x: 0,y 1,z :2) 
+            to be included in the MSD computation.   
         
-        Returns
-        -------
-        msd_results - numpy array (floats) - This is a num_framesx4 numpy array containing the 
-                      results of the MSD computation for the specified frames
-                      msd_results[i,0] = simulation time for frame f = i + fstart
-                      msd_results[i,1] = the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                      msd_results[i,2] = the standard deviation of the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                      msd_results[i,3] = an estimate of the corrsponding diffusion constant based on  
-                                         the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                       {i = 0; i < num_frames}
+    Returns:
+        numpy.array: This is a nx4 numpy array (of floats) containing the 
+            results of the MSD computation for the specified frames.
+            msd_results[i,0] = simulation time for frame f = i + fstart.
+            msd_results[i,1] = the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
+            msd_results[i,2] = the standard deviation of the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
+            msd_results[i,3] = an estimate of the corrsponding diffusion constant based on  
+            the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
+            for i in range( (fend-fstart)+1 ).
     """
     #initialize an array to hold the ouptut
     nfc = fend - fstart + 1
@@ -783,34 +699,43 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
 #function to compute the thickness of the membrane (in the normal direction). The algorithm is based on  
 # the GridMAT-MD bilayer thickness calculation (except without the gridding procedure) 
 def Thickness_frames(frames, fstart, fend, leaflets, nlipids, plane, norm):
-    """
-        This function allows the bilayer "thickness" to be computed
-        for a specified subset of the Frames in a frames (or par_frames) object.     
-        This function was created to be called used in the function MemSys.CalcThickness_parallel
-        as a function to be passed to the multiprocessor threads.   
+    """ Compute the bilayer thickness for a range of Frame objects in frames.
+    Computes the thickness of the bilayer (along the normal direction). The algorithm is based on  
+    the GridMAT-MD bilayer thickness calculation.  
+    This function was created to be called used in MemSys.CalcThickness_parallel
+    as a function to be passed to the multiprocessor threads.   
+    
+    Args:   
+        frames (obj:frames or obj:par_frames): Object containing all the Frame objects of the trajectory.
+        fstart (int): The index of the first frame to start the analysis on.
+        fend (int): The index of the last frame to analyze.
+        leaflets (dict of Leaflet): A dict containing the Leaflet instances used to define the upper and lower
+            bilayer leaflets for this calculation. This dict should contain the two keys, 'upper' and 'lower', corresponding
+            to instances of the Leaflet class.
+        nlipids (int): The total number of LipidCOMs (or lipids) in the two Leaflet instances.
+        plane (list of int): A list of the integer indices corresponding to the bilayer lateral 
+            coordinate planes (0 for x,1 for y, and 2 for z)
+        norm (int): The integer index corresponding to the bilayer normal coordinate plane 
+            (0 for x,1 for y, or 2 for z).
         
-        Parameters
-        ----------
-        frames : frames or par_frames object  - object containing all the Frames of the trajectory
-        fstart : int - the first frame to start the analysis on
-        fend : int - the last frame to analyze
-        leaflets : dict - the MemSys.leaflets instance used to define the Leaflets for this calculation
-                          This input should contain the two keys, 'upper' and 'lower', corresponding
-                          to instances of the Leaflet class.
-        nlipids : int - the total number of LipidCOMs (or lipids) in the Leaflets
-        plane : list - list of the indices corresponding to the bilayer lateral coordinate planes (x: 0,y 1,z :2)
-        norm : int - index corresponding to the bilayer normal coordinate plane (x: 0,y 1,z :2) 
-        
-        Returns
-        -------
-        msd_results - numpy array (floats) - This is a num_framesx4 numpy array containing the 
-                      results of the MSD computation for the specified frames
-                      msd_results[i,0] = simulation time for frame f = i + fstart
-                      msd_results[i,1] = the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                      msd_results[i,2] = the standard deviation of the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                      msd_results[i,3] = an estimate of the corrsponding diffusion constant based on  
-                                         the configurational average MSD over the specified LipidCOMs for frame f = i + fstart
-                       {i = 0; i < num_frames}
+    Returns:
+        tuple of numpy.array: This is a two element tuple containing numpy arrays of the computation results.
+            tuple[0] => thickness: A nx3 numpy array containing the 
+            results of the thickness computation for the specified frames. Specifically:
+                thickness[i,0] = simulation time for frame f = i + fstart.
+                thickness[i,1] = the configurational average thickness for frame f = i + fstart.
+                thickness[i,2] = the standard deviation of the configurational average thickness for frame f = i + fstart.
+                For i in xrange( (fend-fstar) + 1).
+            tuple[1] => thickness_map: A nxNx6 numpy array containing the thickness data that can be 
+            used to generate a 3d thickness map/plot. Specifically:
+                thickness[i,j,0] = simulation time for frame f = i + fstart and lipid j.
+                thickness[i,j,1] = the average x position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                thickness[i,j,2] = the average y position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                thickness[i,j,3] = the lower z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                thickness[i,j,4] = the upper z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                thickness[i,j,5] = the difference between the upper and lower z positions 
+                for lipid j and its cross leaflet partner at frame f = i + fstart.
+                For i in xrange((fend-fstar) + 1) and For j in xrange(nlipids).
     """
     #upper_match = []
     #lower_match = []
@@ -954,17 +879,75 @@ def Thickness_frames(frames, fstart, fend, leaflets, nlipids, plane, norm):
         zavgs[fr,2]=zdevcurr
 #        zavgs[fr,3]=zdtcurr
 #        zavgs[fr,4]=zdtdcurr
-    out = [zavgs,zmaps]
+    out = (zavgs, zmaps)
     return out
     #return zavgs
     #return zmaps
         
 
 ## this is the main class - the Membrane System (MemSys) object
+# The lipids are assumed to be separate residues, so the input selection (mem_sel)
+# is split according to residues with each (full) residue assigned as a LipidCOM. However,
+# it would nice to make it possible to something like a list of selections. That way 
+# you could for example use selections of the lipid headgroups as the LipidCOMs representation.
 class MemSys:
+    """ This is the main class object.
+    An instance of this class reads in the trajectory and a selection (both MDAnalysis objects) 
+    and creates reduces the lipids to center of mass (COM) representations. There are several member
+    functions to perform various types of analyses based on the COM representations. Each lipid in the 
+    system is assumed to be its own residue. 
+                       
+    """
     # pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
     # optional - specify the plane that the membrane is in - default is xy with normal in z
     def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False,nprocs=1):
+        """ MemSys initialization.    
+
+        Args:
+            mda_traj (MDAnalysi.Universe.trajectory): The MDAnalysis trajectory object containg the 
+                the molecular dynamics trajectory data for the system.
+            mem_sel (MDAnalysis.AtomGroup): The MDAnalysis atom selection (AtomGroup) containing
+                the bilayer lipids.
+            plane (str, optional): Defines the lateral plane of the bilayer. The default is 'xy'. 
+                The other options are 'yz' or 'xz', or their equivalent 'zy' or 'zx'.
+            fskip (int, optional): Use every fskip frame in mda_traj. 
+                The default is 1 (i.e. use all frames in mda_traj).
+            frame_path (str, optional): Path in which to store the Shelf database of the Frame objects
+                created for the COM representations. The default is 'Default' which uses the '/tmp/' dir.
+            frame_save (bool, optional): Preserve the Shelf database files of Frame objects for this
+                MemSys after deletion. The default is False (i.e. the Shelf database files are deleted). 
+                If True then the Shelf database files are not removed when this MemSys object is deleted.
+            nprocs (int, optional): Define the number of processors to use when unwrapping the coordinates.
+                The default is 1 (i.e. no paralellization). Greater than 1 uses a parallelized version
+                of the unwrap function when uwrapping coordinates. nprocs should not exceed the 
+                the number of cores on your machine.   
+              
+
+        Atrributes:
+           plane (list of int): A two element list of the integer indices corresponding to the bilayer lateral 
+               coordinate planes (0 for x,1 for y, and 2 for z). Determined by the value of Args:plane. 
+           norm (int): The integer index corresponding to the bilayer normal coordinate plane 
+               (0 for x,1 for y, or 2 for z). Determined by the value of Args:plane.
+           leaflets (dict of Leaflet): A dict containing the Leaflet instances used to define the upper and lower
+               bilayer leaflets for this system. This dict will contain the two keys, 'upper' and 'lower', upper
+               and lower Leaflet objects respectively.
+           com_leaflet (list of str): A list of leaflet name strings that maps the lipid index
+               to the Leaflet ('upper' or 'lower') it has been assigned to. 
+               E.g. 
+               >>> com_leaf[0]
+               >>> 'upper'
+               means lipid index 0 was assigned to the 'upper' leaflet.  
+           nlipids (int): The number of lipids in the system. Each MDAnalysis residue in Args:mem_sel is 
+               treated as a lipid. 
+           clusters (list of list of list int): This is initialized as an empty list. It is used by the function
+               CheckClustering() as a persistent container to store the list of clusters for each frame. clusters is
+                overwritten after each call to CheckClustering().
+           frame (obj:frames): An instance of the Frame container object (frames) to hold the COM trajectory data
+               for this system.
+           nframes (int): The total number of frames processed and stored for the MemSys instance.  
+            
+            
+        """
         #defaults - xy plane with z normal
         ii=0
         jj=1
@@ -1000,6 +983,7 @@ class MemSys:
         self.frame = frames(prefix=frame_path,save=frame_save)
         #loop over the frames
         f=0
+        # you can slice the MDAnalysis trajectory in a loop
         for frame in mda_traj[::fskip]:
             print "doing frame ",frame.frame
             #add the frame object for this frame
@@ -1483,7 +1467,7 @@ class MemSys:
     def ExportClustersForPlotting(self):
         if len(self.clusters) == 0:
             print "Warning!! - call to \'ExportClustersForPlotting\' of a MemSys object with no cluster lists"
-            print " ---------- the \'CheckClustering\' function needs to be called first!"
+            print "      the \'CheckClustering\' function needs to be called first!"
             return 
         xi = self.plane[0]
         yi = self.plane[1]
