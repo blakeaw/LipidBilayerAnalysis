@@ -103,9 +103,9 @@ class LipidCOM:
                 a center of masss coordinates.
             unwrap (bool, optional): Define which com container to store coordiates in.
                 False (default) - The COM coordinates are stored in the 
-                container designated for the unwrapped coordinate representation.
+                container designated for the wrapped coordinate representation.
                 True - The COM coordinates are stored in the container designated
-                for the wrapped coordinate representation.
+                for the unwrapped coordinate representation.
         """
         if unwrap:
             self.com_unwrap = mda_residue.center_of_mass()
