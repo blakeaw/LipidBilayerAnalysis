@@ -218,12 +218,12 @@ class Frame:
 
 #frame wrapper - the name of this class may be changed. e.g. FrameShelve
 class frames:
-    """Container for Frame objects    
-    This class object serves as a container to stores a set of Frame objects
+    """ Container for Frame objects    
+    This class object serves as a container to store a set of Frame objects
     corresponding to a molecular dynamics trajectory. This class saves the Frame objects
     on disk using the shelve module and provides an interface to access instances of
     those saved Frames. The Frames are saved in the shelve database with integer index keys
-    0 -> (nframes-1). 
+    0 -> (nframes-1) and can accessed by indexing the instance of the frames object. 
                     
     """
     #define a non-instance type error message
@@ -362,32 +362,32 @@ class frames:
 # I'm not sure why, but it is marked as ignored and it doesn't seem to cause any problems with the Frame shelve
 # database file.
 class par_frames:
-     """ Read-Only version of frames object  
-     This class is effectively used to generate read-only copies of the frames class, which can be passed 
-     to functions that do parallelized computations over the number of frames.  Unlike frames par_frames 
-     does not create a new Shelf database. It must be passed an existing Shelf of Frame objects. par_frames
-     also does not have any functions defined to modify the Shelf (add/remove Frame objects). This is to
-     avoid conflicts from multiple processor accesses to the Shelf database.  
-                
+    """ Read-Only version of frames object  
+    This class is effectively used to generate read-only copies of the frames class, which can be passed 
+    to functions that do parallelized computations over the number of frames.  Unlike frames par_frames 
+    does not create a new Shelf database. It must be passed an existing Shelf of Frame objects. par_frames
+    also does not have any functions defined to modify the Shelf (add/remove Frame objects). This is to
+    avoid conflicts from multiple processor accesses to the Shelf database.  
+            
     """
     # fs_name does not actually get used, so it should probably be removed.
     def __init__(self, nframes, fs_name, frame_shelve):
         """ Initialize the par_frames object  
-  
+
         Args:
         nframes (int): The number of Frames stored in the shelve database.
         fs_name (string): The base name (prefix) of the shelve database files.
         frame_shelve (shelve.Shelf): The Shelf object containing the Frame objects. 
-       
+
         """
-            self.nframes = nframes            
-            self.fs_name = fs_name 
-            #print "par_frames instance"
-            #print "self.nframes ",self.nframes
-            #print "self.fs_name ",self.fs_name
-            #self.frame_shelf = shelve.open(self.fs_name,flag="r", protocol=2)
-            self.frame_shelf = frame_shelve
-            return
+        self.nframes = nframes            
+        self.fs_name = fs_name 
+        #print "par_frames instance"
+        #print "self.nframes ",self.nframes
+        #print "self.fs_name ",self.fs_name
+        #self.frame_shelf = shelve.open(self.fs_name,flag="r", protocol=2)
+        self.frame_shelf = frame_shelve
+        return
     
     def __getitem__(self,key):
         """ Get a copy of the Frame object stored at key.   
@@ -564,10 +564,10 @@ class Leaflet:
         return len(self.groups)
 
     def GetGroupNames(self):
-         """ Get the names of all the LipidGroup objects in the Leaflet  
- 
-         Returns:
-         list of str: A list of the names of current LipidGroup objects.
+        """ Get the names of all the LipidGroup objects in the Leaflet  
+
+        Returns:
+        list of str: A list of the names of current LipidGroup objects.
         """
         return [group.lg_name for group in self.groups]
 
@@ -582,7 +582,7 @@ class LipidGroup:
 
         Args:
             name (str): The name/type/resname of the lipids being grouped in this object. 
-        
+
         Attributes:
             lg_members (list of int): A list to hold the indices of lipids added to this 
                 this LipidGroup.
@@ -595,7 +595,7 @@ class LipidGroup:
         return
 
     def AddMember(self, new_mem):
-         """ Add lipid index to to the LipidGroup.
+        """ Add lipid index to to the LipidGroup.
    
          Args:
             new_mem (int): The index of the lipid being added to this LipidGroup. 
@@ -629,25 +629,22 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
             to be included in the MSD computation.   
         
     Returns:
-        numpy.array: This is a nx4 numpy array (of floats) containing the 
+        numpy.array: This is a nx2 numpy array (of floats) containing the 
             results of the MSD computation for the specified frames.
             msd_results[i,0] = simulation time for frame f = i + fstart.
             msd_results[i,1] = the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
-            msd_results[i,2] = the standard deviation of the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
-            msd_results[i,3] = an estimate of the corrsponding diffusion constant based on  
-            the configurational average MSD over the specified LipidCOMs for frame f = i + fstart.
             for i in range( (fend-fstart)+1 ).
     """
     #initialize an array to hold the ouptut
     nfc = fend - fstart + 1
-    output = np.zeros((nfc,4))
+    output = np.zeros((nfc, 2))
     # number of lipids in the selection
     n_com = len(indices)
     #initialize a running stats object to do the configuration averaging
     drs_stat = RunningStats()
     # initialize an np array to hold coordinates for the selection
     # at the reference frame
-    com_ref = np.zeros((n_com,2))
+    com_ref = np.zeros((n_com, 2))
     ref_frame = frames[refframe]
     count=0
     # get the coordinates
@@ -665,7 +662,7 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
         # get the current frame
         curr_frame = frames[f]
         # get the coordinates for the selection at this frame
-        com_curr = np.zeros((n_com,2))
+        com_curr = np.zeros((n_com, 2))
         count=0
         for i in indices:
             com_i = curr_frame.lipidcom[i].com_unwrap[plane]
@@ -685,14 +682,14 @@ def MSD_frames(frames, fstart, fend, indices, refframe, plane):
         devcurr = drs_stat.Deviation()
         drs_stat.Reset()
         findex = f-fstart
-        output[findex,0]=tc
-        output[findex,1]=msdcurr
-        output[findex,2]=devcurr
-        dt = tc - time_ref
-        DiffCon = 0.0
-        if f != 0:
-            DiffCon = msdcurr/(4.0*dt)
-        output[findex,3]=DiffCon
+        output[findex, 0]=tc
+        output[findex, 1]=msdcurr
+#        output[findex,2]=devcurr
+#        dt = tc - time_ref
+#        DiffCon = 0.0
+#        if f != 0:
+#            DiffCon = msdcurr/(4.0*dt)
+#        output[findex,3]=DiffCon
     #    print "msdcurr ",msdcurr," DiffCon ",DiffCon
     return output
 
@@ -893,15 +890,21 @@ def Thickness_frames(frames, fstart, fend, leaflets, nlipids, plane, norm):
 class MemSys:
     """ This is the main class object.
     An instance of this class reads in the trajectory and a selection (both MDAnalysis objects) 
-    and creates reduces the lipids to center of mass (COM) representations. There are several member
-    functions to perform various types of analyses based on the COM representations. Each lipid in the 
-    system is assumed to be its own residue. 
+    and creates/reduces the lipids to center of mass (COM) representations. There are several member
+    functions to perform various types of analyses based on the COM representations.    
                        
     """
     # pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
     # optional - specify the plane that the membrane is in - default is xy with normal in z
     def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False,nprocs=1):
         """ MemSys initialization.    
+
+        Each lipid in the system is assumed to be its own residue. It is also assumed that the coordinates 
+        in the MDAnalysis trajectory are wrapped, so when this object is initialized it computes COMs using
+        the wrapped coordinates. It then unwraps the raw coordinates and removes the system COM motion before 
+        recomputing another set of lipid COMs (now basedon the unwrapped coordinates).
+        Both representations are stored and are used in the various analyses. 
+         
 
         Args:
             mda_traj (MDAnalysi.Universe.trajectory): The MDAnalysis trajectory object containg the 
@@ -1073,6 +1076,11 @@ class MemSys:
         return 'Membrane System with %s frames and %s lipids/components' % (self.nframes, self.nlipids)
 
     def NumberOfUniqueGroups(self):
+        """ Get the number of uniquely named LipidGroups within both Leaflet objects.   
+    
+        Returns:
+        int: The number of uniquely named LipidGroup objects.
+        """
         resnames = []
         for leaflet in self.leaflets:
             for group in leaflet.groups:
@@ -1084,10 +1092,31 @@ class MemSys:
         
 
     # function to compute the mean squared displace (msd) along with the diffusion constant of a group 
+    # Possibly add functionality to specify the range of trajectory frames to include int computaton.
     def CalcMSD(self, leaflet="both",group="all"):
+        """ Compute the configurational average mean squared displacement for select lipids in a select leaflet(s).
+
+        This function allows the mean squared displacement (MSD) to be computed
+        for a specified leaflet ('upper', 'lower', or 'both') and for a specified LipidGroup within the 
+        chosen Leaflet. This calculation is over the whole trajectory and assumes the first frame is the 
+        reference frame for computing the displacement.  
+            
+        Args:           
+            leaflet (str): A string designating which Leaflet to include in the computation.
+            group (str): A string with the name of a specific LipidGroup to in the computation. 
+            
+        Returns:
+            numpy.array: This is a nframesx2 numpy array (of floats) containing the 
+                results of the MSD computation across all frames.
+                msd_results[i,0] = simulation time for frame i.
+                msd_results[i,1] = the configurational average MSD over the specified LipidCOMs for frame f = i.
+                For i in range( nframes ).
+        """
+        # initialize a list to hold the indices of LipidCOMs to be included in this computaton.
         indices = []
-        #diffusion dimension - assume lateral so, dim=2
+        #diffusion dimension - assume lateral so, dim=2 -- Although this could made an optional parameter.
         dim=2
+        # parse the leaflet and group inputs
         if leaflet == "both":
             for leaflets in self.leaflets:
                 curr_leaf = self.leaflets[leaflets]
@@ -1117,7 +1146,7 @@ class MemSys:
                 count+=1
         
         #initialize a numpy array to hold the msd for the selection        
-        msd = np.zeros((self.nframes, 7))
+        msd = np.zeros((self.nframes, 2))
         #initialize a running stats object to do the averaging
         drs_stat = RunningStats()
         #initialize a running stats object for the diffusion constant (frame/time average)
@@ -1157,17 +1186,42 @@ class MemSys:
             
             msd[i,0]=dt
             msd[i,1]=msdcurr
-            msd[i,2]=msd_tavg
-            msd[i,3]=msd_dev
-            msd[i,4]=DiffCon
-            msd[i,5]=diff_stat.Mean()
-            msd[i,6]=diff_stat.Deviation()
+#            msd[i,2]=msd_tavg
+#            msd[i,3]=msd_dev
+#            msd[i,4]=DiffCon
+#            msd[i,5]=diff_stat.Mean()
+#            msd[i,6]=diff_stat.Deviation()
         #return msd array
         return msd 
 
     #function to compute the thickness of the membrane (in the normal direction). The algorithm is based on  
     # the GridMAT-MD bilayer thickness calculation (except without the gridding procedure) 
     def CalcMembraneThickness(self):
+        """ Compute the bilayer thickness across the trajectory.
+        Computes the thickness of the bilayer (along the normal direction). The algorithm is based on  
+        the GridMAT-MD bilayer thickness calculation.     
+            
+        Returns:
+            tuple of numpy.array: This is a two element tuple containing numpy arrays of the computation results.
+                tuple[0] => thickness: A nx5 numpy array containing the 
+                results of the thickness computation for the specified frames. Specifically:
+                    thickness[i,0] = simulation time for frame f = i + fstart.
+                    thickness[i,1] = the configurational average thickness for frame f = i + fstart.
+                    thickness[i,2] = the standard deviation of the configurational average thickness for frame f = i + fstart.
+                    thickness[i,3] = the running time average of the configurational average thickness for frame f = i + fstart.
+                    thickness[i,4] = the running standard deviation of the time averaged configurational average thickness for frame f = i + fstart.
+                    For i in xrange( (fend-fstar) + 1).
+                tuple[1] => thickness_map: A nxNx6 numpy array containing the thickness data that can be 
+                used to generate a 3d thickness map/plot. Specifically:
+                    thickness[i,j,0] = simulation time for frame f = i + fstart and lipid j.
+                    thickness[i,j,1] = the average x position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,2] = the average y position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,3] = the lower z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,4] = the upper z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,5] = the difference between the upper and lower z positions 
+                    for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    For i in xrange((fend-fstar) + 1) and For j in xrange(nlipids).
+        """
         #upper_match = []
         #lower_match = []
         xi = self.plane[0]
@@ -1305,11 +1359,36 @@ class MemSys:
             zavgs[fr,3]=zdtcurr
             zavgs[fr,4]=zdtdcurr
 
-        return zavgs,zmaps
+        return (zavgs, zmaps)
         #return zmaps
 
     # a simple cluster/chain analysis routine
-    def CheckClustering(self, leaflet="both",group="all", dist=10.0):
+    def CheckClustering(self, leaflet="both",group="all", dist=15.0):
+        """ Determine physical cluster for select lipid COMs in a select leaflet(s).
+
+        This function determines physical clusters based on Cartesian distance criteria
+        in a specified leaflet ('upper', 'lower', or 'both') and for a specified LipidGroup within the 
+        chosen Leaflet. The routine determines the physical clusters for each frame in the trajectory
+        and computes properties of these clusters, e.g. number of clusters, which are time averaged over the trajectory. 
+        The information on the clusters is stored in MemSys.clusters which can then be used by other functions 
+        (like MemSys.ExportClustersForPlotting).    
+            
+        Args:           
+            leaflet (str, optional): A string designating which Leaflet to include in the computation.
+            group (str, optional): A string with the name of a specific LipidGroup to in the computation.
+            dist (float, optional): The distance cutoff for determining clusters.
+            
+        Returns:
+            numpy.array: This is a nframesx5 numpy array (of floats) containing the 
+                results of this computation across all frames.
+                cluster_results[i,0] = simulation time for frame i.
+                cluster_results[i,1] = the current running time averaged number of clusters at frame f = i.
+                cluster_results[i,2] = the current standard deviation of the running time averaged number of clusters at frame f = i.
+                cluster_results[i,3] = the current running time averaged configurational average lipids per cluster at frame f = i.
+                cluster_results[i,4] = the current standard deviation of the running time averaged 
+                    configurational average lipids per cluster at frame f = i.
+                For i in range( nframes ).
+        """
         indices = []
         
         #diffusion dimension - assume lateral so, dim=2
@@ -1340,7 +1419,7 @@ class MemSys:
         #reset the system cluster list
         self.clusters = []
         # numpy array to store output for return
-        outdata = np.zeros((self.nframes,13))
+        outdata = np.zeros((self.nframes,5))
         #stats objects - time averages
         ncstat = RunningStats() #number of clusters
         asstat = RunningStats() # average cluster size
@@ -1436,24 +1515,32 @@ class MemSys:
             avgsize = clsizestat.Mean()
             #store instantaneous values
             outdata[f,0] = ctime
-            outdata[f,1]= nclusters
-            outdata[f,2] = avgsize
-            outdata[f,3] = mini
-            outdata[f,4] = maxi
+#            outdata[f,1]= nclusters
+#            outdata[f,2] = avgsize
+#            outdata[f,3] = mini
+#            outdata[f,4] = maxi
             #push to the time averages
             ncstat.Push(nclusters)
             asstat.Push(avgsize)
             misstat.Push(mini)
             masstat.Push(maxi)
             #store current time averages
-            outdata[f,5] = ncstat.Mean()
-            outdata[f,6] = ncstat.Deviation()
-            outdata[f,7] = asstat.Mean()
-            outdata[f,8] = asstat.Deviation()
-            outdata[f,9] = misstat.Mean()
-            outdata[f,10] = misstat.Deviation()
-            outdata[f,11] = masstat.Mean()
-            outdata[f,12] = masstat.Deviation()
+#            outdata[f,5] = ncstat.Mean()
+#            outdata[f,6] = ncstat.Deviation()
+#            outdata[f,7] = asstat.Mean()
+#            outdata[f,8] = asstat.Deviation()
+#            outdata[f,9] = misstat.Mean()
+#            outdata[f,10] = misstat.Deviation()
+#            outdata[f,11] = masstat.Mean()
+#            outdata[f,12] = masstat.Deviation()
+            outdata[f,1] = ncstat.Mean()
+            outdata[f,2] = ncstat.Deviation()
+            outdata[f,3] = asstat.Mean()
+            outdata[f,4] = asstat.Deviation()
+#            outdata[f,5] = misstat.Mean()
+#            outdata[f,6] = misstat.Deviation()
+#            outdata[f,7] = masstat.Mean()
+#            outdata[f,8] = masstat.Deviation()
             # now add cluster list to the system storage
             self.clusters.append(list(clusters))
             #print clusters
@@ -1465,6 +1552,31 @@ class MemSys:
     #takes the cluster lists from self.clusters and gets the plane coordinates 
     # need to call the 'CheckClustering' function before calling this one
     def ExportClustersForPlotting(self):
+        """ Determine physical cluster for select lipid COMs in a select leaflet(s).
+
+        This function determines physical clusters based on Cartesian distance criteria
+        in a specified leaflet ('upper', 'lower', or 'both') and for a specified LipidGroup within the 
+        chosen Leaflet. The routine determines the physical clusters for each frame in the trajectory
+        and computes properties of these clusters, e.g. number of clusters, which are time averaged over the trajectory. 
+        The information on the clusters is stored in MemSys.clusters which can then be used by other functions 
+        (like MemSys.ExportClustersForPlotting).    
+            
+        Args:           
+            leaflet (str, optional): A string designating which Leaflet to include in the computation.
+            group (str, optional): A string with the name of a specific LipidGroup to in the computation.
+            dist (float, optional): The distance cutoff for determining clusters.
+            
+        Returns:
+            numpy.array: This is a nframesx5 numpy array (of floats) containing the 
+                results of this computation across all frames.
+                cluster_results[i,0] = simulation time for frame i.
+                cluster_results[i,1] = the current running time averaged number of clusters at frame f = i.
+                cluster_results[i,2] = the current standard deviation of the running time averaged number of clusters at frame f = i.
+                cluster_results[i,3] = the current running time averaged configurational average lipids per cluster at frame f = i.
+                cluster_results[i,4] = the current standard deviation of the running time averaged 
+                    configurational average lipids per cluster at frame f = i.
+                For i in range( nframes ).
+        """
         if len(self.clusters) == 0:
             print "Warning!! - call to \'ExportClustersForPlotting\' of a MemSys object with no cluster lists"
             print "      the \'CheckClustering\' function needs to be called first!"
@@ -1502,7 +1614,7 @@ class MemSys:
                     yc = self.frame[f].lipidcom[index].com[yi]
                     #ycm1 = self.frame[f].lipidcom[index].com[yi]-self.frame[f].box[yi]
                     #ycp1 = self.frame[f].lipidcom[index].com[yi]+self.frame[f].box[yi]
-                     xcoord.append(xc)
+                    xcoord.append(xc)
                     #xm1.append(xcm1)
                     #xp1.append(xcp1)
                     ycoord.append(yc)
@@ -1762,6 +1874,7 @@ class MemSys:
 
     # generate the step vectors of the center of mass--in the lateral dimensions
     def StepVector(self, leaflet="both",group="all",fstart=0,fend=-1,fstep=1000,wrapped=False):
+        
         indices = []
         if fstart<0:
             fstart+=self.nframes
@@ -1900,6 +2013,12 @@ class MemSys:
         return colors_out,cmap
 
     def RemoveLeafletCOMmotion(self,leaflet="both"):
+        """ Remove the independent center of mass (COM) motion of the Leaflets.  
+            
+        Args:           
+            leaflet (str): A string designating which Leaflet to include.
+            
+        """
         do_leaflet = []
         nlip = 0
         if leaflet == "both":
@@ -1947,8 +2066,26 @@ class MemSys:
     ############### multiprocessor parallelized versions of calculation member functions
 
     # parallelized version of CalcMSD- using the multiprocessing module 
-    def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2,timeaverage=False):            
+    def CalcMSD_parallel(self, leaflet="both",group="all",nprocs=2):            
+        """ Parallelized version of CalcMSD
 
+        This function allows the mean squared displacement (MSD) to be computed
+        for a specified leaflet ('upper', 'lower', or 'both') and for a specified LipidGroup within the 
+        chosen Leaflet. This calculation is over the whole trajectory and assumes the first frame is the 
+        reference frame for computing the displacement. The calculation is parallized over the 
+        number of frames in the trejectory using the multiprocessor module. 
+            
+        Args:           
+            leaflet (str): A string designating which Leaflet to include in the computation.
+            group (str): A string with the name of a specific LipidGroup to in the computation. 
+            
+        Returns:
+            numpy.array: This is a nframesx2 numpy array (of floats) containing the 
+                results of the MSD computation across all frames.
+                msd_results[i,0] = simulation time for frame i.
+                msd_results[i,1] = the configurational average MSD over the specified LipidGroup for frame f = i.
+                For i in range( nframes ).
+        """
         indices = []
         #diffusion dimension - assume lateral so, dim=2
         dim=2
@@ -1975,16 +2112,16 @@ class MemSys:
         total_frames = self.nframes
         frames_per_proc_base = total_frames/nprocs
         left_over = total_frames % (frames_per_proc_base * nprocs)
-        print "total frames ",total_frames
-        print "frames per proc ",frames_per_proc_base
-        print "left over ",left_over
+#        print "total frames ",total_frames
+#        print "frames per proc ",frames_per_proc_base
+#        print "left over ",left_over
         #assign base ranges
         for i in xrange(nprocs):
             fs = i*frames_per_proc_base
             fe = fs + frames_per_proc_base - 1
             frame_ranges.append([fs,fe])
-        print "frame_ranges (pre-adjust):"    
-        print frame_ranges
+#        print "frame_ranges (pre-adjust):"    
+#        print frame_ranges
         #now adjust for leftovers - divide them "equally" over the processes
         lo = left_over
         while lo > 0:
@@ -1997,11 +2134,11 @@ class MemSys:
                 if lo == 0:
                     break
         
-        print "nprocs ",nprocs
-        print "frame_ranges (post adjust): "
-        print frame_ranges
+#        print "nprocs ",nprocs
+#        print "frame_ranges (post adjust): "
+#        print frame_ranges
         #initialize a numpy array to hold the msd for the selection        
-        msd = np.zeros((self.nframes, 4))
+        msd = np.zeros((self.nframes, 2))
         #
         msd_frames = MSD_frames
         #frames_local = getattr(self, 'frame')
@@ -2030,24 +2167,43 @@ class MemSys:
             msd[fs:(fe+1)] = p[:]
             i+=1
         pool.close()
-        pool.join()
-        #initialize a numpy array to hold the msd for the selection        
-        msd_tavg = msd[:]
-        if timeaverage:
-            #regenerate the container
-            msd_tavg = np.zeros((self.nframes, 6))
-            # get the running time average
-            tavg_msd = GenRunningAverage(msd[:,1])
-            #slice together the values
-            msd_tavg[:,0:4]=msd[:,:]
-            msd_tavg[:,4:6]=tavg_msd[:,:]
-            
-            
-        #shelf_local.close()
-        return msd_tavg
+        pool.join()        
+
+        return msd
     #function to compute the thickness of the membrane (in the normal direction). The algorithm is based on  
     # the GridMAT-MD bilayer thickness calculation (except without the gridding procedure) 
-    def CalcMembraneThickness_parallel(self,nprocs=2,timeaverage=True):
+    def CalcMembraneThickness_parallel(self,nprocs=2):
+        """ Parallelized version of MemSys.CalcMembraneThickness 
+
+        Computes the thickness of the bilayer (along the normal direction) across the trajectory.
+        The algorithm is based on the GridMAT-MD bilayer thickness calculation. The calculation is 
+        parallized over the number of frames in the trejectory using the multiprocessor module.  
+        This function passes the Thickness_frames fucntion to the multiprocessor threads.   
+
+        Args:   
+            nprocs (int): The number processors (threads) to use in the computation.
+            
+        Returns:
+            tuple of numpy.array: This is a two element tuple containing numpy arrays of the computation results.
+                tuple[0] => thickness: A nx5 numpy array containing the 
+                results of the thickness computation for the specified frames. Specifically:
+                    thickness[i,0] = simulation time for frame f = i + fstart.
+                    thickness[i,1] = the configurational average thickness for frame f = i + fstart.
+                    thickness[i,2] = the standard deviation of the configurational average thickness for frame f = i + fstart.
+                    thickness[i,3] = the running time average of the configurational average thickness for frame f = i + fstart.
+                    thickness[i,4] = the running standard deviation of the time averaged configurational average thickness for frame f = i + fstart.
+                    For i in xrange( (fend-fstar) + 1).
+                tuple[1] => thickness_map: A nxNx6 numpy array containing the thickness data that can be 
+                used to generate a 3d thickness map/plot. Specifically:
+                    thickness[i,j,0] = simulation time for frame f = i + fstart and lipid j.
+                    thickness[i,j,1] = the average x position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,2] = the average y position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,3] = the lower z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,4] = the upper z position for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    thickness[i,j,5] = the difference between the upper and lower z positions 
+                    for lipid j and its cross leaflet partner at frame f = i + fstart.
+                    For i in xrange((fend-fstar) + 1) and For j in xrange(nlipids).
+        """
         nlip = self.nlipids
         comcup = np.zeros(3)
         comclo = np.zeros(3)
@@ -2115,20 +2271,18 @@ class MemSys:
             i+=1
         pool.close()
         pool.join()
-        #initialize a numpy array to hold the msd for the selection        
-        zdist_tavg = zdists
-        if timeaverage:
-            #regenerate the container
-            zdist_tavg = np.zeros((self.nframes, 5))
-            # get the running time average
-            tavg_dz = GenRunningAverage(zdists[:,1])
-            #slice together the values
-            zdist_tavg[:,0:3]=zdists[:,:]
-            zdist_tavg[:,3:5]=tavg_dz[:,:]
+                
+        #regenerate the container
+        zdist_tavg = np.zeros((self.nframes, 5))
+        # get the running time average
+        tavg_dz = GenRunningAverage(zdists[:,1])
+        #slice together the values
+        zdist_tavg[:,0:3]=zdists[:,:]
+        zdist_tavg[:,3:5]=tavg_dz[:,:]
             
             
         #shelf_local.close()
-        return zdsit_tavg,zmaps
+        return (zdist_tavg, zmaps)
         #return zdist_tavg
 
 
