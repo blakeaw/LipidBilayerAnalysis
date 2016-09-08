@@ -186,7 +186,7 @@ def ElectronDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, a
         f+=1
     counts/=nframes
     centers-=reference
-    return centers,counts
+    return (centers, counts)
 
 #assigns the charge of each atom as a gaussian along the profile direction
 def ElectronDensityProfile_gaussians(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis='z',nbins=100,reference=0.0,refsel=None,valence=True,size_to_sigma=2.0):
@@ -298,7 +298,7 @@ def ElectronDensityProfile_gaussians(trajectory,mda_selection, fstart=0,fend=-1,
         f+=1
     counts/=nframes
     centers-=reference
-    return centers,counts
+    return (centers, counts)
 
 
 
@@ -396,7 +396,7 @@ def MassDensityProfile(trajectory,mda_selection, fstart=0,fend=-1,fstep=1, axis=
         f+=1
     counts/=nframes
     centers-=reference
-    return centers,counts
+    return (centers, counts)
 
 class SizeError(Exception):
     def __init__(self):

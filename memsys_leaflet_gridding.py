@@ -30,7 +30,7 @@ class LipidGrid_2d:
         # x
         self.x_min = 0.0
         self.x_max = boxx
-         self.x_edges = np.linspace(self.x_min,self.x_max,(nxbins+1),endpoint=True)
+        self.x_edges = np.linspace(self.x_min,self.x_max,(nxbins+1),endpoint=True)
         self.x_incr = self.x_edges[1]-self.x_edges[0]
         x_incr_h = self.x_incr/2.0
         self.x_centers = np.zeros(nxbins)
@@ -42,7 +42,7 @@ class LipidGrid_2d:
         # y
         self.y_min = 0.0
         self.y_max = boxy
-         self.y_edges = np.linspace(self.y_min,self.y_max,(nybins+1),endpoint=True)
+        self.y_edges = np.linspace(self.y_min,self.y_max,(nybins+1),endpoint=True)
         self.y_incr = self.y_edges[1]-self.y_edges[0]
         y_incr_h = self.y_incr/2.0
         self.y_centers = np.zeros(nybins)

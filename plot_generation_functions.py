@@ -19,7 +19,7 @@ sfig_params = {
     'savefig.format' : 'eps'
     }
 mpl.rcParams.update(sfig_params)
-params = {'figure.figsize': [6.0, 4.0]}
+params = {'figure.figsize': [8.0, 6.0]}
 mpl.rcParams.update(params)
 #sns.set_style("whitegrid")
 #sns.set_style("white")
@@ -51,6 +51,7 @@ def plot_step_vectors(vectors, colors=None, filename='step_vectors.eps',show=Fal
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
 
 def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_out='ns',show=False):
@@ -97,10 +98,11 @@ def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_ou
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
 
 
-def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='ps',time_out='ns',show=False):
+def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='ps',time_out='ns',show=False, interval=1):
     '''
     Generates a single plot with area per lipid (apl) curves
     Takes outputs from:
@@ -111,18 +113,18 @@ def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='
     i = 0
     for apl_dat in apl_dat_list:
         apl_d = apl_dat.copy()
-        t = apl_d[:,0]
+        t = apl_d[::interval,0]
         if time_in == 'ps' and time_out == 'ns':
             #print "switching time units from ps to ns"
             t/=100.0
         elif time_in == 'ns' and time_out == 'ps':
             t*=100.0
-        apl = apl_d[:,2]
-        apl_dev = apl_d[:,3]
+        apl = apl_d[::interval,2]
+        apl_dev = apl_d[::interval,3]
         if name_list is not None:
-            print "plotting",name_list[i]," with errorbars"
-            print t
-            print apl
+            #print "plotting",name_list[i]," with errorbars"
+            #print t
+            #print apl
             plt.errorbar(t, apl, yerr=apl_dev,linewidth=2.0,label=name_list[i])
         else:
             plt.errorbar(t, apl, yerr=apl_dev,linewidth=2.0)
@@ -137,6 +139,7 @@ def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
 
 
@@ -176,6 +179,7 @@ def plot_cluster_dat_number(clust_dat_list,name_list=None,filename='clust_number
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
 
 def plot_cluster_dat_size(clust_dat_list,name_list=None,filename='clust_size.eps',time_in='ps',time_out='ns',show=False):
@@ -214,10 +218,11 @@ def plot_cluster_dat_size(clust_dat_list,name_list=None,filename='clust_size.eps
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
 
 
-def plot_cluster_maps(clusters, filename='cluster_map.png',show=False):
+def plot_cluster_maps(clusters, filename='cluster_map.eps',show=False):
     '''
     Generates a single plot of the lipid cluster map 
     Takes a single frame of the output from:
@@ -232,5 +237,37 @@ def plot_cluster_maps(clusters, filename='cluster_map.png',show=False):
     plt.savefig(filename)
     if show:
         return plt.show()
+    plt.close()
     return
+
+def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps', show=False, label_list=None):
+    """ Plot density profiles
+    This function can be used to plot the results of density profiles functions 
+    in the mda_density_profile module.
+    
+    Args:
+        dp_out_list (list of tuples): A list of the tuple outputs of the profile calculation functions
+        save (bool, optional): Default is True. Saves the plot output as an image file if True.
+        filename (str, optional): The name out the image file that will be created if save=True.
+        show (bool, optional): Default is False. Display the plot (plt.show) if True.
+        label_list (list of str : None, optional): Default is None. Allows a list of strings used to 
+            label the plot lines.
+    """
+    i = 0
+    for item in dp_out_list:
+        if label_list is not None:
+
+            plt.plot(item[0], item[1], linewidth=2.0, label=label_list[i])
+        else:
+            plt.plot(item[0], item[1], linewidth=2.0)
+    if label_list is not None:
+        plt.legend(loc=2)
+        
+    if save:
+        plt.savefig(filename)
+    if show:
+        return plt.show()
+    plt.close()
+    return
+
 
