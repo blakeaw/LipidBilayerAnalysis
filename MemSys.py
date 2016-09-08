@@ -994,7 +994,7 @@ class MemSys:
             # set the box dimensions and the time for this frame
             cframe.SetBox(frame.dimensions[0:3])
             cframe.SetTime(frame.time)
-            #print "time ",frame.time
+            print "time ",frame.time
             cframe.number = f
             # loop over the residues (lipids) and get the centers of mass
             r=0            
@@ -1020,7 +1020,7 @@ class MemSys:
         f=0
         for frame in mda_traj[::fskip]:    
             #first we unwrapp
-            print "unwrapping frame ",frame.frame
+            #print "unwrapping frame ",frame.frame
             currcoord = frame._pos[index]
             if firstframe:
                 oldcoord = np.copy(currcoord)
@@ -1544,9 +1544,9 @@ class MemSys:
             # now add cluster list to the system storage
             self.clusters.append(list(clusters))
             #print clusters
-            print "Frame ",f
-            print "There are ",nclusters," clusters with an average size of ",avgsize
-            print "the largest cluster was ",maxi," and the smallest was ",mini
+           # print "Frame ",f
+           # print "There are ",nclusters," clusters with an average size of ",avgsize
+           # print "the largest cluster was ",maxi," and the smallest was ",mini
 
         return outdata    
     #takes the cluster lists from self.clusters and gets the plane coordinates 
@@ -1630,7 +1630,26 @@ class MemSys:
     # function to compute an approximation of the area per lipid of a group using 
     # closest neighbor circles 
     def CalcAreaPerLipid_ClosestNeighborCircle(self, leaflet="both",group="all"):
-        
+        """ Approximate the area per lipid for select lipid COMs in a select leaflet(s).
+
+        This function computes an approximation of the area per lipid of a selection of lipid COMs
+        by locating the closest neighbor and computing the non-overlapping circular area the two 
+        equiradius circles formed by the vector between the two COM points. At each frame this is averaged 
+        over the configuration.    
+            
+        Args:           
+            leaflet (str, optional): A string designating which Leaflet to include in the computation.
+            group (str, optional): A string with the name of a specific LipidGroup to in the computation.
+            
+        Returns:
+            numpy.array: This is a nframesx4 numpy array (of floats) containing the 
+                results of this computation across all frames.
+                apl_results[i,0] = simulation time for frame i.
+                apl_results[i,1] = configurational average area per lipid at frame f = i.
+                apl_results[i,2] = the current running time average (of the configurational average) at frame f = i.
+                apl_results[i,3] = the current standard deviation of the running time average at frame f = i.
+                For i in range( nframes ).
+        """
         #diffusion dimension - assume lateral so, dim=2
         dim=2
         do_leaflet = []
@@ -1653,7 +1672,7 @@ class MemSys:
         zi = self.norm
         sub_fact = (2.0*np.pi/3.0 - np.sqrt(3.0)/2.0)
         #initialize a numpy array to hold the msd for the selection        
-        areas = np.zeros((self.nframes, 5))
+        areas = np.zeros((self.nframes, 4))
         #initialize a running stats object to do the averaging
         area_stat = RunningStats()
         n_leaflet = len(do_leaflet)
@@ -1722,12 +1741,31 @@ class MemSys:
             areas[f][1]=area_conf_avg
             areas[f][2]=area_time_run
             areas[f][3]=area_time_run_dev
-            areas[f][4]=lat_area/nlip
+            #areas[f][4]=lat_area/nlip
         return areas
 
     # function to compute the area per lipid using the lateral box sizes and numbers of lipids:
     def CalcAreaPerLipid_Box(self, leaflet="both"):
-        
+        """ Approximate the area per lipid for select lipid COMs in a select leaflet(s).
+
+        This function computes a composite approximation of the area per lipid by simply 
+        dividing lateral area of the simulation box by the number lipids in a specific 
+        leaflet. 
+            
+        Args:           
+            leaflet (str, optional): A string designating which Leaflet to include in the computation.
+                Default is 'both': the area per lipid is averaged over the two leaflets.
+            group (str, optional): A string with the name of a specific LipidGroup to in the computation.
+            
+        Returns:
+            numpy.array: This is a nframesx4 numpy array (of floats) containing the 
+                results of this computation across all frames.
+                apl_results[i,0] = simulation time for frame i.
+                apl_results[i,1] = area per lipid at frame f = i.
+                apl_results[i,2] = the current running time average (area per lipid) at frame f = i.
+                apl_results[i,3] = the current standard deviation of the running time average at frame f = i.
+                For i in range( nframes ).
+        """
         #diffusion dimension - assume lateral so, dim=2
         dim=2
         do_leaflet = []
@@ -2010,7 +2048,7 @@ class MemSys:
             colors_out[count] = cmap[name_i]
             count+=1
             
-        return colors_out,cmap
+        return (colors_out, cmap)
 
     def RemoveLeafletCOMmotion(self,leaflet="both"):
         """ Remove the independent center of mass (COM) motion of the Leaflets.  
@@ -2062,6 +2100,9 @@ class MemSys:
                     fr.lipidcom[i].com_unwrap-=lcom
             self.frame[f]=fr
         return
+
+    
+
 
     ############### multiprocessor parallelized versions of calculation member functions
 
@@ -2214,16 +2255,16 @@ class MemSys:
         total_frames = self.nframes
         frames_per_proc_base = total_frames/nprocs
         left_over = total_frames % (frames_per_proc_base * nprocs)
-        print "total frames ",total_frames
-        print "frames per proc ",frames_per_proc_base
-        print "left over ",left_over
+#        print "total frames ",total_frames
+#        print "frames per proc ",frames_per_proc_base
+#        print "left over ",left_over
         #assign base ranges
         for i in xrange(nprocs):
             fs = i*frames_per_proc_base
             fe = fs + frames_per_proc_base - 1
             frame_ranges.append([fs,fe])
-        print "frame_ranges (pre-adjust):"    
-        print frame_ranges
+#        print "frame_ranges (pre-adjust):"    
+#        print frame_ranges
         #now adjust for leftovers - divide them "equally" over the processes
         lo = left_over
         while lo > 0:
@@ -2236,10 +2277,10 @@ class MemSys:
                 if lo == 0:
                     break
         
-        print "nprocs ",nprocs
-        print "frame_ranges (post adjust): "
-        print frame_ranges
-        
+#        print "nprocs ",nprocs
+#        print "frame_ranges (post adjust): "
+#        print frame_ranges
+#        
         thick_frames = Thickness_frames
         frames_local = par_frames(self.frame.nframes,self.frame.fs_name,self.frame.frame_shelf)
         plane_local = self.plane
@@ -2247,11 +2288,11 @@ class MemSys:
         #create process pool
         pool = mp.Pool(processes=nprocs)
         results = [pool.apply_async(thick_frames,args=(frames_local,frame_ranges[i][0],frame_ranges[i][1],self.leaflets,nlip,plane_local,norm_local)) for i in range(0,nprocs)]
-        print "results:"
+        #print "results:"
     #    print results
-        print "len(results) ",len(results)
+        #print "len(results) ",len(results)
         results_ordered = [p.get() for p in results]
-        print "results ordered: "
+        #print "results ordered: "
     #    print results_ordered
 #        #collect results  into single array for return
         i = 0
