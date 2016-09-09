@@ -394,8 +394,8 @@ class LeafletGrids:
                 grid_val = in_grid[ix,iy]
                 out_dict[l_i]=grid_val         
         return out_dict
-
-    def GetXYZ(self,leaflet='both',zvalue_dict=None,color_dict=None,color_grid=None):
+    
+    def GetXYZC(self,leaflet='both',zvalue_dict=None,color_dict=None,color_grid=None, color_type_dict=None):
         do_leaflet = []
         if leaflet == "both":
             do_leaflet.append('upper')
@@ -414,6 +414,13 @@ class LeafletGrids:
         Y = np.zeros(npoints)
         Z = np.zeros(npoints)
         C = np.zeros(npoints)
+        if color_dict is not None:
+            if len(color_dict.shape)==2:
+                C = np.zeros((npoints, color_dict.shape[1])) 
+        if color_type_dict is not None:
+            dict_type = type(color_type_dict[color_type_dict.keys()[0]])
+            if dict_type is str:
+                C = np.zeros(npoints,dtype=np.str)
         for leaf in do_leaflet:
             npt = 0
             cx=0
@@ -433,24 +440,29 @@ class LeafletGrids:
                         C[npt]=color_dict[ic]
                     if color_grid is not None:
                         C[npt]=color_grid[cx,cy]
+                    if color_type_dict is not None:
+                        ltype = self.frame.lipidcom[ic].type
+                        color_curr = color_type_dict[ltype]
+                        C[npt]=color_curr
+                        
                     npt+=1
                     cy+=1
                 cx+=1    
-            if color_dict is not None:
+            if color_dict is not None and len(color_dict.shape)==1:
                 col_min = min(C)
                 C-=col_min
                 col_max = max(C)
                 C/=col_max
-                out_dict[leaf]=(X,Y,Z,C)
+                
             elif color_grid is not None:
                 col_min = min(C)
                 C-=col_min
                 col_max = max(C)
                 C/=col_max
-                out_dict[leaf]=(X,Y,Z,C)
-            else:    
-                out_dict[leaf]=(X,Y,Z)
-        return    out_dict
+                
+            
+            out_dict[leaf]=(X,Y,Z,C)
+        return out_dict
     
     def WriteXYZ(self,leaflet='both',zvalue_dict='Default',out_path="./"):
         do_leaflet = []
