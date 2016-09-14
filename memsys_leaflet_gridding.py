@@ -238,7 +238,7 @@ class LeafletGrids:
         system_average = area_run.Mean()
         system_dev = area_run.Deviation()            
         
-        output = ((system_average,system_dev),average_per_res,area_per_lipid)        
+        output = (system_average, average_per_res, area_per_lipid)        
         return output
 
     def Curvature(self):
