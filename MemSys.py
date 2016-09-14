@@ -1918,7 +1918,8 @@ class MemSys:
             fstart+=self.nframes
         if fend < 0:
             fend+=self.nframes
-
+        if fstep == 'single':
+            fstep = fend-fstart
         #diffusion dimension - assume lateral so, dim=2
         dim=2
         if leaflet == "both":
