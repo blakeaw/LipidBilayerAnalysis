@@ -270,4 +270,11 @@ def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps',
     plt.close()
     return
 
-
+def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=False):
+    plt.scatter(xyzc[0], xyzc[1], c=xyzc[3], marker='s',s=100)
+    if save:
+        plt.savefig(filename)
+    if show:
+        return plt.show()
+    plt.close()
+    return
