@@ -23,13 +23,14 @@ psf = 'step5_charmm2amber.psf'
 traj_in_pre = "step7_"
 traj_in_post = ".nc"
 traj_start = 1
-traj_end = 3
+traj_end = 1
 ns_per_traj = 10.0
 frame_per_traj = 500
 frame_skip = 10
 group_list = ['DOPE','POPC']
 #group_list = ['DOPE','POPC','TLCL2']
 outputpath = '/home/blake/LipidOut/Analysis_Outputs/mem0/'
+outpath=outputpath
 nprocs = 6
 
 print "Creating mda universe"
@@ -112,6 +113,7 @@ apl_names = [ 'All' ]
 pgf.plot_area_per_lipid(apl_list,filename=outputpath+'apl_box.eps',interval=10)
 pgf.plot_area_per_lipid(apl_list,filename=outputpath+'apl_box.png', interval=10)
 for item in group_list:
+    print "Doing APL for ",item
     apl = mem_sys.CalcAreaPerLipid_ClosestNeighborCircle(group=item)
     name1 = outputpath+"apl_"+item+".pickle"
     outfile = open(name1,'wb')
@@ -122,8 +124,9 @@ for item in group_list:
         apl_names.append('CL')
     else:
         apl_names.append(item)
-
-pgf.plot_area_per_lipid(apl_list,name_list=apl_names, interval=10)
+print "plot APLs .eps"
+pgf.plot_area_per_lipid(apl_list,name_list=apl_names, filename=outputpath+'apl.eps', interval=10)
+print "plot APLs .png"
 pgf.plot_area_per_lipid(apl_list,name_list=apl_names,filename=outputpath+'apl.png', interval=10)
 del apl_list
 del apl_names
@@ -211,7 +214,7 @@ del disp_u_colors
 
 #Lipid Gridding Analysis
 print "doing leaflet gridding analysis...."
-fstep = 100
+fstep = 1
 simtime = []
 avgthick = []
 apl_comp = []
@@ -224,25 +227,31 @@ mean_curv_lga = []
 for i in xrange(0,mem_sys.nframes,fstep):
     fs = 'frame_'+str(i)
     frame_curr = mem_sys.frame[i]
+    print "Frame ",frame_curr.number 
     cstime = frame_curr.time
     simtime.append(cstime)    
-    leafgrids = lg.LeafletGrids(frame_curr, mem_sys.leaflets, mem_sys.plane, nxbins=100, nybins = 100)
+    print " building grids..."
+    leafgrids = lg.LeafletGrids(frame_curr, mem_sys.leaflets, mem_sys.plane, nxbins=20, nybins = 20)
+    print "computing thicknesses..."
     thick,thickgrid = leafgrids.AverageThickness(return_grid=True)
-    xyzc = leafgrids.GetXYZC(leaflet='lower', color_grid=thickgrid)
-    pgf.plot_grid_as_scatter(xyzc, filename=outpath+'thickness_grid_'+fs+'.png')
-    pgf.plot_grid_as_scatter(xyzc, filename=outpath+'thickness_grid_'+fs+'.eps')
-    xyzc = leafgrids.GetXYZC(leaflet='lower', color_type_dict=type_color)
+    xyzc = leafgrids.GetXYZC(leaflet='lower', color_grid=thickgrid)['lower']
+    #with sns.color_palette("PuBuGn_d"):
+    pgf.plot_grid_as_scatter(xyzc, filename=outpath+'thickness_grid_'+fs+'.png', colorbar=True)
+    pgf.plot_grid_as_scatter(xyzc, filename=outpath+'thickness_grid_'+fs+'.eps', colorbar=True)
+    print " constructing the grid plots..."
+    xyzc = leafgrids.GetXYZC(leaflet='lower', color_type_dict=type_color)['lower']
     pgf.plot_grid_as_scatter(xyzc, filename=outpath+'lipid_grid_lower_'+fs+'.png')
     pgf.plot_grid_as_scatter(xyzc, filename=outpath+'lipid_grid_lower_'+fs+'.eps')
-    xyzc = leafgrids.GetXYZC(leaflet='upper', color_type_dict=type_color)
+    xyzc = leafgrids.GetXYZC(leaflet='upper', color_type_dict=type_color)['upper']
     pgf.plot_grid_as_scatter(xyzc, filename=outpath+'lipid_grid_upper_'+fs+'.png')
     pgf.plot_grid_as_scatter(xyzc, filename=outpath+'lipid_grid_upper_'+fs+'.eps')
-    avgthick.append(thick)
+    print "thick ",thick
+    avgthick.append(thick[0])
     apls = leafgrids.AreaPerLipid()   
     apl_comp.append(apls[0])
     for group in group_list:
-        apl_per_type[group].append(apls[1][group]) 
-    curvatures = leafgrid.Curvature()
+        apl_per_type[group].append(apls[1][group][0]) 
+    curvatures = leafgrids.Curvature()
     mcu = curvatures[0][0]
     gcu = curvatures[0][1]
     mcl = curvatures[1][0]
@@ -251,7 +260,11 @@ for i in xrange(0,mem_sys.nframes,fstep):
     mean_curv_lga.append( mcl.mean() )
 #convert to numpy arrays
 simtime = np.array(simtime)
+simtime/=1000.0
+print "avgthick "
+print avgthick
 avgthick = np.array(avgthick)
+print avgthick
 apl_comp = np.array(apl_comp)
 for group in group_list:
     apl_per_type[group] = np.array(apl_per_type[group])
@@ -261,7 +274,7 @@ mean_curv_lga = np.array(mean_curv_lga)
 for group in group_list:
     apl_per_type[group] = np.array(apl_per_type[group])
 #get time averages
-avgthick = ms.GenRunningAverage(avgthick)
+avgthick_run = ms.GenRunningAverage(avgthick)
 apl_comp = ms.GenRunningAverage(apl_comp)  
 for group in group_list:
     apl_per_type[group] = ms.GenRunningAverage(apl_per_type[group])
@@ -272,15 +285,16 @@ mean_curv_lga =  ms.GenRunningAverage(mean_curv_lga)
 plt.errorbar(simtime, apl_comp[:,0], yerr=apl_comp[:,1],linewidth=2.0,label="All")
 for group in group_list:
     plt.errorbar(simtime, apl_per_type[group][:,0], yerr=apl_per_type[group][:,1],linewidth=2.0,label=group)
-xlabel = "Time ("+time_out+")"
+xlabel = "Time (ns)"
 plt.xlabel(xlabel)
 plt.ylabel("Area per lipid ($\AA^2$)")
 plt.legend(loc=2)
+outpath=outputpath
 plt.savefig(outpath+'APLs_by_grid.png')
 plt.savefig(outpath+'APLs_by_grid.eps')
 plt.close()
 # bilayer thickness
-plt.errorbar(simtime, avgthick[:,0], yerr=avgthick[:,1],linewidth=2.0)
+plt.errorbar(simtime, avgthick_run[:,0], yerr=avgthick_run[:,1],linewidth=2.0)
 plt.xlabel(xlabel)
 plt.ylabel("Average Bilayer Thickness ($\AA$)")
 plt.savefig(outpath+'BT_by_grid.png')
