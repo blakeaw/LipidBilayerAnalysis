@@ -448,17 +448,17 @@ class LeafletGrids:
                     npt+=1
                     cy+=1
                 cx+=1    
-            if color_dict is not None and len(color_dict.shape)==1:
-                col_min = min(C)
-                C-=col_min
-                col_max = max(C)
-                C/=col_max
+           # if color_dict is not None and len(color_dict.shape)==1:
+           #     col_min = min(C)
+           #     C-=col_min
+           #     col_max = max(C)
+           #     C/=col_max
                 
-            elif color_grid is not None:
-                col_min = min(C)
-                C-=col_min
-                col_max = max(C)
-                C/=col_max
+           # elif color_grid is not None:
+           #     col_min = min(C)
+           #     C-=col_min
+           #     col_max = max(C)
+           #     C/=col_max
                 
             
             out_dict[leaf]=(X,Y,Z,C)

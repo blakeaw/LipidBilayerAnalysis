@@ -270,8 +270,17 @@ def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps',
     plt.close()
     return
 
-def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=False):
-    plt.scatter(xyzc[0], xyzc[1], c=xyzc[3], marker='s',s=100)
+
+def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=False, colorbar=False):
+    cma = plt.cm.get_cmap('viridis')
+    #print in_xyzc[3]
+    plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=100, cmap=cma)
+    #cax, kw = mpl.colorbar.make_axes(plt.gca())
+    #norm = mpl.colors.Normalize(vmin = min(in_xyzc[3]), vmax = max(in_xyzc[3]), clip = False)
+
+    #c = mpl.colorbar.ColorbarBase(cax, cmap=cma, norm=norm)
+    if colorbar:
+        plt.colorbar()
     if save:
         plt.savefig(filename)
     if show:
