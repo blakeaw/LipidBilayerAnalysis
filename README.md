@@ -14,7 +14,8 @@ Center of Mass (COM) representation functions and classes:
                     (although this requires up to a few GB of free disk space).
 				
 Dependencies:
-    NumPy
-    SciPy
-    Matplotlib
-    Seaborn
+    NumPy,
+    SciPy,
+    Matplotlib,
+    Seaborn,
+    MDAnalysis
