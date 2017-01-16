@@ -7,6 +7,7 @@ https://stanford.edu/~mwaskom/software/seaborn/index.html).
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.colors as colors
 import seaborn as sns
 import numpy as np
 
@@ -54,7 +55,7 @@ def plot_step_vectors(vectors, colors=None, filename='step_vectors.eps',show=Fal
     plt.close()
     return
 
-def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_out='ns',show=False):
+def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_out='ns',show=False, interval=1):
     '''
     Generates a single plot with Mean Squared Displacement curves
     Takes outputs from:
@@ -77,12 +78,12 @@ def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_ou
     i = 0
     for msd_dat in msd_dat_list:
         msd_d = msd_dat.copy()
-        t = msd_d[:,0]
+        t = msd_d[::interval,0]
         if time_in == 'ps' and time_out == 'ns':
-            t/=100.0
+            t/=1000.0
         elif time_in == 'ns' and time_out == 'ps':
-            t*=100.0
-        msd = msd_d[:,1]
+            t*=1000.0
+        msd = msd_d[::interval,1]
         if name_list is not None:
             plt.plot(t, msd, linewidth=2.0,label=name_list[i])
         else:
@@ -93,7 +94,7 @@ def plot_msd(msd_dat_list,name_list=None,filename='msd.eps',time_in='ps',time_ou
     plt.xlabel(xlabel)
     plt.ylabel("Distance in XY plane ($\AA^2$)")
     if name_list is not None:
-        plt.legend(loc=2)
+        plt.legend(loc=0)
         
     plt.savefig(filename)
     if show:
@@ -110,15 +111,16 @@ def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='
         MemSys.CalcAreaPerLipid_ClosestNeighborCircle
     The outputs are passed to function in a list input: apl_dat_list
     '''
+    #print "filename: ", filename
     i = 0
     for apl_dat in apl_dat_list:
         apl_d = apl_dat.copy()
         t = apl_d[::interval,0]
         if time_in == 'ps' and time_out == 'ns':
             #print "switching time units from ps to ns"
-            t/=100.0
+            t/=1000.0
         elif time_in == 'ns' and time_out == 'ps':
-            t*=100.0
+            t*=1000.0
         apl = apl_d[::interval,2]
         apl_dev = apl_d[::interval,3]
         if name_list is not None:
@@ -134,7 +136,7 @@ def plot_area_per_lipid(apl_dat_list,name_list=None,filename='apl.eps',time_in='
     plt.xlabel(xlabel)
     plt.ylabel("Area per lipid ($\AA^2$)")
     if name_list is not None:
-        plt.legend(loc=2)
+        plt.legend(loc=0)
         
     plt.savefig(filename)
     if show:
@@ -156,9 +158,9 @@ def plot_cluster_dat_number(clust_dat_list,name_list=None,filename='clust_number
         t = cl_loc[:,0]
         if time_in == 'ps' and time_out == 'ns':
             #print "switching time units from ps to ns"
-            t/=100.0
+            t/=1000.0
         elif time_in == 'ns' and time_out == 'ps':
-            t*=100.0
+            t*=1000.0
         cl = cl_loc[:,5]
         cl_dev = cl_loc[:,6]
         if name_list is not None:
@@ -174,7 +176,7 @@ def plot_cluster_dat_number(clust_dat_list,name_list=None,filename='clust_number
     plt.xlabel(xlabel)
     plt.ylabel("Average Number of Clusters")
     if name_list is not None:
-        plt.legend(loc=2)
+        plt.legend(loc=0)
         
     plt.savefig(filename)
     if show:
@@ -195,9 +197,9 @@ def plot_cluster_dat_size(clust_dat_list,name_list=None,filename='clust_size.eps
         t = cl_loc[:,0]
         if time_in == 'ps' and time_out == 'ns':
             #print "switching time units from ps to ns"
-            t/=100.0
+            t/=1000.0
         elif time_in == 'ns' and time_out == 'ps':
-            t*=100.0
+            t*=1000.0
         cl = cl_loc[:,7]
         cl_dev = cl_loc[:,8]
         if name_list is not None:
@@ -213,7 +215,7 @@ def plot_cluster_dat_size(clust_dat_list,name_list=None,filename='clust_size.eps
     plt.xlabel(xlabel)
     plt.ylabel("Average Size of Cluster (lipids per cluster)")
     if name_list is not None:
-        plt.legend(loc=2)
+        plt.legend(loc=0)
         
     plt.savefig(filename)
     if show:
@@ -240,7 +242,7 @@ def plot_cluster_maps(clusters, filename='cluster_map.eps',show=False):
     plt.close()
     return
 
-def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps', show=False, label_list=None):
+def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps', show=False, label_list=None, ylabel='Density'):
     """ Plot density profiles
     This function can be used to plot the results of density profiles functions 
     in the mda_density_profile module.
@@ -260,9 +262,11 @@ def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps',
             plt.plot(item[0], item[1], linewidth=2.0, label=label_list[i])
         else:
             plt.plot(item[0], item[1], linewidth=2.0)
+        i+=1
     if label_list is not None:
-        plt.legend(loc=2)
-        
+        plt.legend(loc=0)
+    plt.ylabel(ylabel)
+    plt.xlabel('Position Along the Normal')    
     if save:
         plt.savefig(filename)
     if show:
@@ -271,10 +275,30 @@ def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps',
     return
 
 
-def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=False, colorbar=False):
+def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=False, colorbar=False, cmap=None, vmin=None, vmax=None):
     cma = plt.cm.get_cmap('viridis')
+    if cmap is not None:
+        cma = cmap
+   # fig = plt.figure()
+   # ax = fig.add_subplot(111)
+   ## dx = np.abs(in_xyzc[0][1]-in_xyzc[0][0])
+    #dy = np.abs(in_xyzc[1][1]-in_xyzc[1][0])
+    #ds = [dx]
+    #if dy > dx:
+    #    ds = [dy]  
+     
+    #ds_in_points = np.diff(ax.transData.transform(zip([0]*1, ds)))[0] 
+    #print ds_in_points
+    if vmin is not None and vmax is None:
+        plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=50, cmap=cma, vmin=vmin)
+    elif vmax is not None and vmin is None:
+        plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=50, cmap=cma, vmax=vmax)
+    elif vmin is not None and vmax is not None:
+        plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s', s=50, cmap=cma, vmin=vmin, vmax=vmax)
+    else:
+        plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=50, cmap=cma)
     #print in_xyzc[3]
-    plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=100, cmap=cma)
+    #plt.scatter(in_xyzc[0], in_xyzc[1], c=in_xyzc[3], marker='s',s=50, cmap=cma)
     #cax, kw = mpl.colorbar.make_axes(plt.gca())
     #norm = mpl.colors.Normalize(vmin = min(in_xyzc[3]), vmax = max(in_xyzc[3]), clip = False)
 
@@ -287,3 +311,43 @@ def plot_grid_as_scatter(in_xyzc, save=True, filename='lipid_grid.eps', show=Fal
         return plt.show()
     plt.close()
     return
+
+def plot_average_deuterium_op(dop_dat_list,name_list=None,filename='dop.eps',time_in='ps',time_out='ns',show=False, interval=1):
+    '''
+    Generates a single plot of the average deuterium order parameter vs. time
+
+    The outputs are passed to function in a list input: dop_dat_list
+    '''
+    #print "filename: ", filename
+    i = 0
+    for dop_dat in dop_dat_list:
+        dop_d = dop_dat.copy()
+        t = dop_d[::interval,0]
+        if time_in == 'ps' and time_out == 'ns':
+            #print "switching time units from ps to ns"
+            t/=1000.0
+        elif time_in == 'ns' and time_out == 'ps':
+            t*=1000.0
+        dop = dop_d[::interval,1]
+        dop_dev = dop_d[::interval,2]
+        if name_list is not None:
+            #print "plotting",name_list[i]," with errorbars"
+            #print t
+            #print dop
+            plt.errorbar(t, dop, yerr=dop_dev,linewidth=2.0,label=name_list[i])
+        else:
+            plt.errorbar(t, dop, yerr=dop_dev,linewidth=2.0)
+        i+=1
+        #plt.title("Mean Sqared Displacement vs. Time")
+    xlabel = "Time ("+time_out+")"
+    plt.xlabel(xlabel)
+    plt.ylabel("Average Deuterium Order Parameter")
+    if name_list is not None:
+        plt.legend(loc=0)
+        
+    plt.savefig(filename)
+    if show:
+        return plt.show()
+    plt.close()
+    return
+

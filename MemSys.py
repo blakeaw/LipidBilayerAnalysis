@@ -52,6 +52,7 @@ def GenRunningAverage(onednparray):
         averager.Push(onednparray[i])
         run_avg = averager.Mean()
         run_dev = averager.Deviation()
+       # print run_avg, run_dev, averager.Mean(), onednparray[i]
         output[i,0] = run_avg
         output[i,1] = run_dev
     return output
@@ -131,7 +132,8 @@ class Frame:
             lipidcom (list of obj:LipidCOM): A list of the LipidCOM objects assigned to the Frame.
             box (np.array): A 3 element vector containing the (rectangular) xyz box edge lengths. 
             time (float): The simulation time that this Frame represents.
-            number (int): The frame number (or timestep) of this Frame.
+            number (int): The frame number of this Frame.
+            mdnumber (int): The corresponding frame number in the original MD trajectory
             
         """
         # list to store the nlipids LipidCOM objects
@@ -144,6 +146,8 @@ class Frame:
         self.time = np.zeros(1)
         # frame number
         self.number = np.zeros(1,dtype=np.int)
+        # frame number in the MD trajectory
+        self.mdnumber = np.zeros(1,dtype=np.int)
         # initialize all the LipidCOM objects
         for i in xrange(nlipids):
             self.lipidcom.append(LipidCOM())
@@ -215,6 +219,43 @@ class Frame:
                 total_mass+=lipid.mass    
         com_out/=total_mass
         return com_out
+    
+    def WriteXYZ(self, xyz_name, wrapped=True):
+        # Open up the file to write to
+        xyz_out = open(xyz_name, "w")
+        
+        comment = "Memsys Frame "+str(self.number)+" MD Frame "+str(self.mdnumber)
+        xyz_out.write(str(len(self.lipidcom)))
+        xyz_out.write("\n")
+        xyz_out.write(comment)
+        xyz_out.write("\n")
+        
+        
+        
+        i=0
+        for lip in self.lipidcom:
+            #get the coordinates
+            x = self.lipidcom[i].com[0]
+            y = self.lipidcom[i].com[1]
+            z = self.lipidcom[i].com_unwrap[2]
+            if not wrapped:
+               x = self.lipidcom[i].com_unwrap[0]
+               y = self.lipidcom[i].com_unwrap[1]
+               #z = self.lipidcom[i].com_unwrap[2] 
+                
+            #get the lipid resname
+            oname = self.lipidcom[i].type
+            
+            #write to file
+            line = str(oname)+" "+str(x)+" "+str(y)+" "+str(z)
+            xyz_out.write(line)
+            xyz_out.write("\n")
+            i+=1
+                 
+        xyz_out.close()
+        return
+
+        
 
 #frame wrapper - the name of this class may be changed. e.g. FrameShelve
 class frames:
@@ -896,7 +937,7 @@ class MemSys:
     """
     # pass the mda anaylis trajectory object and a selection with the membrane (i.e. w/o water and ions)
     # optional - specify the plane that the membrane is in - default is xy with normal in z
-    def __init__(self, mda_traj, mem_sel, plane="xy",fskip=1,frame_path='Default',frame_save=False,nprocs=1):
+    def __init__(self, mda_traj, mem_sel, plane="xy",fstart=0, fend=-1, fskip=1,frame_path='Default',frame_save=False,nprocs=1):
         """ MemSys initialization.    
 
         Each lipid in the system is assumed to be its own residue. It is also assumed that the coordinates 
@@ -984,11 +1025,15 @@ class MemSys:
         #initialize empty frame list
         #self.frame=[]
         self.frame = frames(prefix=frame_path,save=frame_save)
+        #adjust for slicing index        
+        fend+=1        
         #loop over the frames
         f=0
+        #fskip-=1
         # you can slice the MDAnalysis trajectory in a loop
-        for frame in mda_traj[::fskip]:
-            print "doing frame ",frame.frame
+        for frame in mda_traj[fstart:fend:fskip]:
+            mdframe = frame.frame
+            print "doing frame ", mdframe
             #add the frame object for this frame
             cframe = Frame(self.nlipids)
             # set the box dimensions and the time for this frame
@@ -996,6 +1041,7 @@ class MemSys:
             cframe.SetTime(frame.time)
             print "time ",frame.time
             cframe.number = f
+            cframe.mdnumber = mdframe
             # loop over the residues (lipids) and get the centers of mass
             r=0            
             for res in mem_sel.residues:
@@ -1949,7 +1995,7 @@ class MemSys:
         zi = self.norm
         
         vec_ends_out = []
-        for    f in xrange(fstart,fend+1,fstep):
+        for    f in xrange(fstart+fstep,fend+1,fstep):
             fprev = f-fstep
             # get the current frame
             curr_frame = self.frame[f]
@@ -1976,6 +2022,23 @@ class MemSys:
             
         return vec_ends_out
 
+    # return the MemSys frame numbers associated with step vectors calculation
+    def StepVectorFrames(self,fstart=0,fend=-1,fstep=1000):
+        
+        
+        if fstart<0:
+            fstart+=self.nframes
+        if fend < 0:
+            fend+=self.nframes
+        if fstep == 'single':
+            fstep = fend-fstart
+        output = []
+        
+        for f in xrange(fstart+fstep,fend+1,fstep):
+            fprev = f-fstep
+            output.append([fprev, f])
+        return np.array(output, dtype=np.int)
+    
     # generate the step vectors of the center of mass
     def StepVectorColors(self, leaflet="both",group="all"):
         indices = []            
@@ -2097,6 +2160,7 @@ class MemSys:
                     lcom+=(fr.lipidcom[i].com_unwrap*fr.lipidcom[i].mass)
                     masst+=fr.lipidcom[i].mass
                 lcom/=masst
+                lcom[2]=0.0
                 for i in indices:
                     fr.lipidcom[i].com_unwrap-=lcom
             self.frame[f]=fr
