@@ -13,9 +13,9 @@ Center of Mass (COM) representation functions and classes:
 	            This allows large trajectories to be processed without eating up all the RAM 
                     (although this requires up to a few GB of free disk space).
 				
-Dependencies:
-    NumPy,
-    SciPy,
-    Matplotlib,
-    Seaborn,
-    MDAnalysis
+# Dependencies:
+   * NumPy,
+   * SciPy,
+   * Matplotlib,
+   * Seaborn,
+   * MDAnalysis
