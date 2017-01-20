@@ -20,7 +20,10 @@ sfig_params = {
     'savefig.format' : 'eps'
     }
 mpl.rcParams.update(sfig_params)
-params = {'figure.figsize': [8.0, 6.0]}
+params = {'figure.figsize': [8.5, 6.0], 'font.size': 14, 'axes.labelsize': 14,
+    'legend.fontsize': 14,
+    'xtick.labelsize': 12,
+    'ytick.labelsize': 12,}
 mpl.rcParams.update(params)
 #sns.set_style("whitegrid")
 #sns.set_style("white")
@@ -259,14 +262,16 @@ def plot_density_profile(dp_out_list, save=True, filename='density_profile.eps',
     for item in dp_out_list:
         if label_list is not None:
 
-            plt.plot(item[0], item[1], linewidth=2.0, label=label_list[i])
+            plt.plot(item[1], item[0], linewidth=2.0, label=label_list[i])
         else:
             plt.plot(item[0], item[1], linewidth=2.0)
         i+=1
     if label_list is not None:
         plt.legend(loc=0)
     plt.ylabel(ylabel)
-    plt.xlabel('Position Along the Normal')    
+    plt.xlabel('Position Along the Normal')   
+    plt.xlabel(ylabel)
+    plt.ylabel('Position Along the Normal')  
     if save:
         plt.savefig(filename)
     if show:

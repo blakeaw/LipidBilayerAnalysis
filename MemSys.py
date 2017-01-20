@@ -954,6 +954,10 @@ class MemSys:
                 the bilayer lipids.
             plane (str, optional): Defines the lateral plane of the bilayer. The default is 'xy'. 
                 The other options are 'yz' or 'xz', or their equivalent 'zy' or 'zx'.
+            fstart (int, optional): The index of the initial frame to use from the MDAnalysis trajectory.
+                The default is 0.
+            fstart (int, optional): The index of the final frame to use from the MDAnalysis trajectory.
+                The default is -1 (i.e. the last frame).
             fskip (int, optional): Use every fskip frame in mda_traj. 
                 The default is 1 (i.e. use all frames in mda_traj).
             frame_path (str, optional): Path in which to store the Shelf database of the Frame objects
@@ -1024,9 +1028,20 @@ class MemSys:
         self.clusters = [] # after 'CheckClustering' is called, the outersize len(self.clusters) should equal self.nframes
         #initialize empty frame list
         #self.frame=[]
+        if frame_path == 'Default':
+            frame_path = '/tmp/'
         self.frame = frames(prefix=frame_path,save=frame_save)
-        #adjust for slicing index        
-        fend+=1        
+        #adjust for slicing index
+        len_mda_traj = len(mda_traj)
+        #adjust for negative indexing
+        while fstart < 0:
+            fstart+=len_mda_traj 
+        while fend < 0:
+            fend+=len_mda_traj 
+
+        #adjust endpoint for slicing
+        fend+=1
+         
         #loop over the frames
         f=0
         #fskip-=1
@@ -1064,7 +1079,7 @@ class MemSys:
         # loop over the trajectory again to get unwrapped coordinates
         # unwrap the raw residue coordinates - then get the COMs
         f=0
-        for frame in mda_traj[::fskip]:    
+        for frame in mda_traj[fstart:fend:fskip]:    
             #first we unwrapp
             #print "unwrapping frame ",frame.frame
             currcoord = frame._pos[index]
@@ -1400,7 +1415,7 @@ class MemSys:
             zdtcurr = zdtstat.Mean()
             zdtdcurr = zdtstat.Deviation()
             zavgs[fr,0]=dt
-            zavgs[fr,1]=zavgcurr
+            zavgs[fr,1]=zavgcurr   
             zavgs[fr,2]=zdevcurr
             zavgs[fr,3]=zdtcurr
             zavgs[fr,4]=zdtdcurr

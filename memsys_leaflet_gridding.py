@@ -11,7 +11,7 @@ import numpy as np
 from RunningStats import *
 
 class LipidGrid_2d:
-    def __init__(self, ms_frame, ms_com_indices,ms_plane,nxbins=50,nybins=50):
+    def __init__(self, ms_frame, ms_com_indices,ms_plane,nxbins=50,nybins=50, embedded_protein=None):
         #store the frame and leaflet
         self.frame = ms_frame
         #self.leaflet = ms_leaflet
@@ -54,6 +54,7 @@ class LipidGrid_2d:
         self.y_length = self.y_max-self.y_min
         # get the lipid indices for this leaflet
         indices = ms_com_indices
+        void_ind = max(indices)+1
         #now assign lipids to the gridpoints
         self.lipid_grid = np.zeros((nxbins,nybins),dtype=np.int)
         self.lipid_grid_z = np.zeros((nxbins,nybins))
@@ -66,10 +67,11 @@ class LipidGrid_2d:
                 r_min = 1.0e10
                 i_min = 0
                 z_min = 0.0
+                #check lipid COMs
                 for i in indices:
                     xi = ms_frame.lipidcom[i].com[ix]
                     yi = ms_frame.lipidcom[i].com[iy]
-                    zi = ms_frame.lipidcom[i].com[iz]
+                    zi = ms_frame.lipidcom[i].com_unwrap[iz]
                     #print "iz ",iz," zi ",zi
                     dx = x-xi
                     dy = y-yi
@@ -83,9 +85,14 @@ class LipidGrid_2d:
                         r_min=rxy
                         i_min = i
                         z_min = zi
+                #if embedded_protein is not None:
+                    
                 #print "i_min ",i_min," z_min ",z_min
-                self.lipid_grid[cx,cy]=i_min
-                self.lipid_grid_z[cx,cy]=z_min
+               # if cutoff is not None:
+                    
+               # else:
+               self.lipid_grid[cx,cy]=i_min
+               self.lipid_grid_z[cx,cy]=z_min
                 cy+=1
             cx+=1
     
@@ -127,8 +134,10 @@ class LipidGrid_2d:
         xyz_out.close()
         return
 
+        
+
 class LeafletGrids:
-    def __init__(self, ms_frame, ms_leaflets,ms_plane,nxbins=50,nybins=50):
+    def __init__(self, ms_frame, ms_leaflets,ms_plane,nxbins=50,nybins=50, embedded_protein=None):
         #store the frame and leaflet
         self.frame = ms_frame
         self.com_leaflets = ms_leaflets
@@ -137,7 +146,7 @@ class LeafletGrids:
         self.nbins_x = nxbins
         self.nbins_y = nybins
         self.leaflets = {}
-        self.myframe = ms_frame.number
+        self.myframe = ms_frame.mdnumber
         #initialize the grids
         #upper
         upper_indices = ms_leaflets['upper'].GetMemberIndices()
@@ -155,6 +164,8 @@ class LeafletGrids:
                 zl = self.leaflets['lower'].GetZAt(ix,iy)
                 dz = zu - zl
                 tgrid[ix,iy]=dz 
+                if dz < 0.0:
+                    print "Warning!!--MD frame number ",self.myframe," --Value thickness less than zero (",dz,") at grid point ",ix," ",iy 
         return tgrid
     
     def AverageThickness(self,return_grid=False):
@@ -517,5 +528,33 @@ class LeafletGrids:
         return
 
 
+    def get_integer_type_arrays():
+        
+        for leaf in self.leaflets.keys():
+            #groups in the leaflet
+            groups = self.com_leaflets[leaf].GetGroupNames()
+            ngroups = len(groups)
+            group_to_int = {}
+            # build dictionary for string group name to integer type
+            for i in xrange(ngroups):
+                group_to_int[groups[i]] = i
+            out_dict = {}
+            nxbins = self.leaflets[leaf].x_nbins
+            nybins = self.leaflets[leaf].y_nbins
+            type_array = np.zeros((nxbins, nybins), dtype=np.int)
+            cx=0
+            for x in self.leaflets[leaf].x_centers:
+                cy=0
+                for y in self.leaflets[leaf].y_centers:
+                    #get the z coordinate
+                    ic = self.leaflets[leaf].GetIndexAt(cx,cy)                    
+                    oname = self.frame.lipidcom[ic].type
+                    itype = group_to_int[oname]
+                    type_array[cx,cy] = itype
+                    cy+=1
+                cx+=1
+            out_dict[leaf] = np.copy(type_array)
+            
+        return out_dict
 
-
+        
